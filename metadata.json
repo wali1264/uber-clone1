@@ -1,0 +1,7 @@
+{
+  "name": "MediScript Pro - Digital Prescription System",
+  "description": "A comprehensive digital prescription platform for doctors featuring AI-assisted diagnosis, drug interaction checks, patient history management, and voice-to-prescription capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
