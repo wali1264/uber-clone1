@@ -22,10 +22,11 @@ const App: React.FC = () => {
   const [customDrugs, setCustomDrugs] = useState<DrugInfo[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   
-  // Font Settings State
+  // Font & Layout Settings State
   const [fontConfig, setFontConfig] = useState({
     family: 'Vazirmatn',
-    size: 14
+    size: 14,
+    direction: 'rtl' as 'rtl' | 'ltr'
   });
 
   useEffect(() => {
@@ -59,7 +60,7 @@ const App: React.FC = () => {
     sessionStorage.removeItem('isLoggedIn');
   };
 
-  const updateFont = (config: { family: string, size: number }) => {
+  const updateFont = (config: typeof fontConfig) => {
     setFontConfig(config);
     localStorage.setItem('font_config', JSON.stringify(config));
   };
@@ -200,13 +201,13 @@ const App: React.FC = () => {
                 </div>
               </button>
 
-              {/* Font Settings Card */}
+              {/* Font & Layout Settings Card */}
               <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all">
                 <div className="w-16 h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-3xl mb-6">
                   <i className="fa-solid fa-font"></i>
                 </div>
-                <h3 className="text-xl font-black text-slate-800">تنظیمات فونت نسخه</h3>
-                <p className="text-sm text-slate-500 mt-2 leading-relaxed mb-6">انتخاب قلم و اندازه متن برای نسخه چاپی جهت خوانایی بهتر.</p>
+                <h3 className="text-xl font-black text-slate-800">تنظیمات فونت و قالب</h3>
+                <p className="text-sm text-slate-500 mt-2 leading-relaxed mb-6">انتخاب قلم، اندازه متن و جهت قرارگیری محتوا برای نسخه چاپی.</p>
                 
                 <div className="space-y-4">
                   <div>
@@ -232,10 +233,22 @@ const App: React.FC = () => {
                       onChange={(e) => updateFont({ ...fontConfig, size: parseInt(e.target.value) })}
                     />
                   </div>
-                  <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 mt-4">
-                    <p style={{ fontFamily: fontConfig.family, fontSize: `${fontConfig.size}px` }} className="text-slate-800">
-                      نمونه متن نسخه: ۲ عدد کپسول امپرازول هر ۱۲ ساعت
-                    </p>
+                  <div>
+                    <label className="text-xs font-bold text-slate-400 block mb-2">جهت قرارگیری (Direction)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button 
+                        onClick={() => updateFont({ ...fontConfig, direction: 'rtl' })}
+                        className={`py-2 rounded-xl text-xs font-bold border transition-all ${fontConfig.direction === 'rtl' ? 'bg-purple-600 text-white border-transparent' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                      >
+                        راست به چپ (RTL)
+                      </button>
+                      <button 
+                        onClick={() => updateFont({ ...fontConfig, direction: 'ltr' })}
+                        className={`py-2 rounded-xl text-xs font-bold border transition-all ${fontConfig.direction === 'ltr' ? 'bg-purple-600 text-white border-transparent' : 'bg-slate-50 text-slate-400 border-slate-100'}`}
+                      >
+                        چپ به راست (LTR)
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

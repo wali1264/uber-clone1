@@ -12,7 +12,7 @@ interface PrescriptionFormProps {
   onSave: (p: Prescription) => void;
   onCancel: () => void;
   onAddDrug?: (d: DrugInfo) => void;
-  fontConfig: { family: string, size: number };
+  fontConfig: { family: string, size: number, direction: 'rtl' | 'ltr' };
 }
 
 const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ doctor, patient, recentPrescriptions, allDrugs, onSave, onCancel, onAddDrug, fontConfig }) => {
@@ -439,7 +439,7 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ doctor, patient, re
             </div>
 
             <div className="flex-1 bg-slate-200 p-6 md:p-12 overflow-y-auto flex flex-col items-center custom-scrollbar">
-              <div id="printable-prescription" className="bg-white shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 text-slate-900 origin-top mb-10" dir="rtl"
+              <div id="printable-prescription" className="bg-white shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)] transition-all duration-300 text-slate-900 origin-top mb-10" dir={fontConfig.direction}
                 style={{ 
                   width: `${customDimensions.width}mm`, 
                   minHeight: `${customDimensions.height}mm`, 
@@ -458,7 +458,7 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ doctor, patient, re
                       <p className="text-sm font-bold text-slate-600">{doctor.specialty}</p>
                       <p className="text-[10px] text-slate-400 font-bold mt-1.5">{doctor.clinicName}</p>
                     </div>
-                    <div className="text-left text-[11px] font-bold leading-relaxed text-slate-700">
+                    <div className="text-end text-[11px] font-bold leading-relaxed text-slate-700">
                       <p>کابل، افغانستان</p>
                       <p>تماس: {doctor.phone || '۰۷۸۹۰۰۰۰۰۰'}</p>
                       <p className="text-slate-900 mt-1 font-black">{new Date().toLocaleDateString('fa-AF')}</p>
@@ -467,10 +467,10 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ doctor, patient, re
                   <div className="grid grid-cols-3 gap-6 text-xs mb-10 p-4 bg-slate-50 border border-slate-100 rounded-xl">
                     <p>نام مریض: <span className="font-black">{patient.name}</span></p>
                     <p className="text-center">سن: <span className="font-black">{patient.age} سال</span></p>
-                    <p className="text-left">شناسه: <span className="font-black">{patient.code}</span></p>
+                    <p className="text-end">شناسه: <span className="font-black">{patient.code}</span></p>
                   </div>
                   <div className="flex gap-10 flex-grow">
-                    <div className="w-1/4 pl-6 space-y-4 text-[11px] border-l border-slate-200">
+                    <div className="w-1/4 pe-6 space-y-4 text-[11px] border-e border-slate-200">
                       <h4 className="font-black border-b border-slate-900 pb-1.5 uppercase tracking-tighter">Observations</h4>
                       {['bp', 'hr', 'temp', 'spo2'].map(s => <div key={s} className="flex justify-between border-b border-dotted border-slate-300 pb-1.5 uppercase"><span className="opacity-50 font-bold">{s}:</span><span className="font-black">{(clinicalRecord as any)[s] || '---'}</span></div>)}
                       {clinicalRecord.cc && <div className="mt-6 pt-4 border-t border-slate-100"><span className="opacity-30 block mb-1 text-[9px] font-black uppercase">Chief Complaint:</span><p className="italic leading-relaxed font-medium">{clinicalRecord.cc}</p></div>}
@@ -479,9 +479,9 @@ const PrescriptionForm: React.FC<PrescriptionFormProps> = ({ doctor, patient, re
                       <span className="text-7xl font-serif italic mb-8 block leading-none font-black text-slate-900">Rx</span>
                       <div className="space-y-8">
                         {meds.map((m, i) => (
-                          <div key={m.id} className="pr-4 border-r-2 border-slate-50">
+                          <div key={m.id} className="ps-4 border-s-2 border-slate-50">
                             <p className="font-black text-xl mb-2 text-slate-900">{i+1}. {m.name} <span className="text-xs font-normal opacity-40">({m.form})</span></p>
-                            <div className="mr-6 space-y-1">
+                            <div className="ms-6 space-y-1">
                                 <div className="flex flex-wrap gap-x-10 text-[13px] font-black text-slate-800">
                                   <span>{m.dosage} <span className="text-[10px] font-bold opacity-30">({m.frequency})</span></span>
                                   {m.instructions && <span className="text-blue-900">{m.instructions}</span>}
