@@ -1,7 +1,7 @@
 {
-  "name": "MediScript Pro - Digital Prescription System",
-  "description": "A comprehensive digital prescription platform for doctors featuring AI-assisted diagnosis, drug interaction checks, patient history management, and voice-to-prescription capabilities.",
+  "name": "Asan Noskha - Afghan Doctor's Assistant",
+  "description": "A lightweight, fast prescription management tool for doctors in Afghanistan, featuring patient tracking, drug management, and quick prescription generation.",
   "requestFramePermissions": [
-    "microphone"
+    "camera"
   ]
 }
