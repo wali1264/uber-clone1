@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
   <head>
@@ -13,11 +12,21 @@
         background-color: #f8fafc;
       }
       @media print {
+        @page {
+          size: auto; /* Allows printer to handle A4/A5 */
+          margin: 5mm; /* Minimal margin to bring content to the top */
+        }
         .no-print {
           display: none !important;
         }
         body {
           background-color: white !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+        #root {
+          margin: 0 !important;
+          padding: 0 !important;
         }
       }
     </style>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, 
@@ -22,7 +23,14 @@ import {
   FileText,
   UserPlus,
   LogOut,
-  Lock
+  Lock,
+  Maximize2,
+  Minimize2,
+  Type,
+  User,
+  Phone,
+  Calendar,
+  Check
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS } from './constants';
@@ -95,16 +103,24 @@ const App: React.FC = () => {
     patients.find(p => p.id === selectedPatientId), 
   [patients, selectedPatientId]);
 
-  const handleAddPatient = (p: any) => {
+  const handleAddPatient = (p: Omit<Patient, 'id' | 'code' | 'createdAt'>) => {
     const newId = Math.random().toString(36).substr(2, 9);
+    
+    // Robust code calculation
+    const maxCode = patients.reduce((max, pat) => {
+      if (!pat.code || !pat.code.includes('-')) return max;
+      const parts = pat.code.split('-');
+      const num = parseInt(parts[1]);
+      return !isNaN(num) && num > max ? num : max;
+    }, 1000);
+    
     const newPatient: Patient = {
       ...p,
       id: newId,
-      code: `P-${1000 + patients.length + 1}`,
+      code: `P-${maxCode + 1}`,
       createdAt: Date.now()
     };
     
-    // Using functional update to ensure we have the latest state
     setPatients(prev => [newPatient, ...prev]);
     setSelectedPatientId(newId);
     setView('NEW_PRESCRIPTION');
@@ -191,12 +207,12 @@ const App: React.FC = () => {
                <h2 className="text-2xl font-bold mb-1">خوش آمدید، {clinicSettings.doctor.split(' ')[1] || 'داکتر'} صاحب!</h2>
                <p className="text-indigo-200 text-sm font-medium">{new Date().toLocaleDateString('fa-AF', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
                
-               <div className="mt-8 flex gap-3">
-                 <button onClick={() => setView('NEW_PATIENT')} className="flex-1 bg-white/10 hover:bg-white/20 p-5 rounded-[2rem] flex flex-col items-center gap-2 transition-all border border-white/5">
+               <div className="mt-8 flex gap-3 relative z-10">
+                 <button onClick={() => setView('NEW_PATIENT')} className="flex-1 bg-white/10 hover:bg-white/20 p-5 rounded-[2rem] flex flex-col items-center gap-2 transition-all border border-white/5 active:scale-95">
                    <UserPlus className="w-8 h-8 text-white" />
                    <span className="text-xs font-bold">مریض جدید</span>
                  </button>
-                 <button onClick={() => setView('PATIENTS')} className="flex-1 bg-white/10 hover:bg-white/20 p-5 rounded-[2rem] flex flex-col items-center gap-2 transition-all border border-white/5">
+                 <button onClick={() => setView('PATIENTS')} className="flex-1 bg-white/10 hover:bg-white/20 p-5 rounded-[2rem] flex flex-col items-center gap-2 transition-all border border-white/5 active:scale-95">
                    <Users className="w-8 h-8 text-white" />
                    <span className="text-xs font-bold">لیست مریضان</span>
                  </button>
@@ -265,9 +281,9 @@ const App: React.FC = () => {
 
         {view === 'NEW_PATIENT' && <PatientForm onSubmit={handleAddPatient} onCancel={() => setView('HOME')} />}
 
-        {view === 'NEW_PRESCRIPTION' && selectedPatientId && currentSelectedPatient && (
+        {view === 'NEW_PRESCRIPTION' && selectedPatientId && (
           <PrescriptionForm 
-            patient={currentSelectedPatient}
+            patient={currentSelectedPatient || patients.find(p => p.id === selectedPatientId) || patients[0]}
             drugTemplates={drugTemplates}
             previousPrescriptions={prescriptions.filter(pr => pr.patientId === selectedPatientId)}
             onSubmit={handleAddPrescription}
@@ -347,8 +363,17 @@ const NavBtn: React.FC<{ active: boolean, icon: React.ReactNode, label: string, 
 );
 
 const PatientForm: React.FC<{ onSubmit: (p: any) => void, onCancel: () => void }> = ({ onSubmit, onCancel }) => {
-  const [data, setData] = useState({ name: '', fatherName: '', phone: '', age: '', gender: 'male' });
-  const isFormValid = data.name.trim().length >= 2;
+  const [data, setData] = useState({ name: '', fatherName: '', phone: '', age: '', gender: 'male' as const });
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Focus the name input immediately when the form opens
+    if (nameInputRef.current) {
+      nameInputRef.current.focus();
+    }
+  }, []);
+
+  const isFormValid = data.name.trim().length >= 3;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,45 +382,131 @@ const PatientForm: React.FC<{ onSubmit: (p: any) => void, onCancel: () => void }
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent, nextFieldRef?: React.RefObject<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (nextFieldRef?.current) {
+        nextFieldRef.current.focus();
+      } else if (isFormValid) {
+        handleSubmit(e as any);
+      }
+    }
+  };
+
+  const fatherRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+  const ageRef = useRef<HTMLInputElement>(null);
+
   return (
-    <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 space-y-5 animate-in slide-in-from-bottom duration-400">
-      <div className="flex items-center gap-3 border-r-4 border-indigo-600 pr-3">
-        <h2 className="text-xl font-bold text-gray-800">ثبت هویت مریض</h2>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <FormGroup label="نام مکمل مریض *">
-          <input required className="w-full p-4 rounded-2xl bg-gray-50 border-none shadow-inner text-sm focus:ring-2 focus:ring-indigo-500 text-right" placeholder="مثلاً: احمد خان" value={data.name} onChange={e => setData({...data, name: e.target.value})} />
-        </FormGroup>
-        <FormGroup label="نام پدر">
-          <input className="w-full p-4 rounded-2xl bg-gray-50 border-none shadow-inner text-sm text-right" placeholder="مثلاً: محمد علی" value={data.fatherName} onChange={e => setData({...data, fatherName: e.target.value})} />
-        </FormGroup>
-        <FormGroup label="نمبر موبایل">
-          <input className="w-full p-4 rounded-2xl bg-gray-50 border-none shadow-inner text-sm font-mono text-right" placeholder="۰۷xxxxxxxx" value={data.phone} onChange={e => setData({...data, phone: e.target.value})} />
-        </FormGroup>
-        <div className="grid grid-cols-2 gap-4">
-          <FormGroup label="سن (سال)">
-            <input className="w-full p-4 rounded-2xl bg-gray-50 border-none shadow-inner text-sm text-right" type="number" value={data.age} onChange={e => setData({...data, age: e.target.value})} />
-          </FormGroup>
-          <FormGroup label="جنسیت">
-            <select className="w-full p-4 rounded-2xl bg-gray-50 border-none shadow-inner text-sm text-right" value={data.gender} onChange={e => setData({...data, gender: e.target.value as any})}>
-              <option value="male">مرد</option>
-              <option value="female">زن</option>
-              <option value="other">سایر</option>
-            </select>
-          </FormGroup>
+    <div className="bg-white p-6 rounded-[2.5rem] shadow-xl border border-gray-100 space-y-6 animate-in slide-in-from-bottom duration-500">
+      <div className="flex items-center justify-between border-b border-gray-50 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-indigo-50 rounded-2xl">
+            <UserPlus className="w-6 h-6 text-indigo-600" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-800">ثبت هویت مریض</h2>
         </div>
-        <div className="flex gap-3 pt-6">
-          <button type="submit" disabled={!isFormValid} className="flex-[2] bg-indigo-700 text-white p-5 rounded-2xl font-bold shadow-xl shadow-indigo-100 disabled:opacity-50 transition-all active:scale-[0.98]">تأیید و ادامه</button>
-          <button type="button" onClick={onCancel} className="flex-1 bg-gray-100 text-gray-500 p-5 rounded-2xl font-bold transition-all hover:bg-gray-200">انصراف</button>
+        <button onClick={onCancel} className="p-2 text-gray-400 hover:text-gray-600 bg-gray-50 rounded-full transition-colors">
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <FormGroup label="نام مکمل مریض (ضروری)" icon={<User className="w-4 h-4" />}>
+          <input 
+            ref={nameInputRef}
+            required 
+            className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all text-sm text-right outline-none font-bold" 
+            placeholder="مثلاً: احمد فرید" 
+            value={data.name} 
+            onChange={e => setData({...data, name: e.target.value})}
+            onKeyDown={e => handleKeyDown(e, fatherRef)}
+          />
+        </FormGroup>
+
+        <FormGroup label="نام پدر" icon={<Users className="w-4 h-4" />}>
+          <input 
+            ref={fatherRef}
+            className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all text-sm text-right outline-none" 
+            placeholder="نام پدر را وارد کنید..." 
+            value={data.fatherName} 
+            onChange={e => setData({...data, fatherName: e.target.value})}
+            onKeyDown={e => handleKeyDown(e, phoneRef)}
+          />
+        </FormGroup>
+
+        <FormGroup label="نمبر موبایل" icon={<Phone className="w-4 h-4" />}>
+          <input 
+            ref={phoneRef}
+            type="tel"
+            className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all text-sm font-mono text-right outline-none" 
+            placeholder="۰۷xxxxxxxx" 
+            value={data.phone} 
+            onChange={e => setData({...data, phone: e.target.value})}
+            onKeyDown={e => handleKeyDown(e, ageRef)}
+          />
+        </FormGroup>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormGroup label="سن (سال)" icon={<Calendar className="w-4 h-4" />}>
+            <input 
+              ref={ageRef}
+              type="number"
+              className="w-full p-4 rounded-2xl bg-gray-50 border-2 border-transparent focus:border-indigo-500 focus:bg-white transition-all text-sm text-right outline-none font-bold" 
+              placeholder="مثلاً: ۲۵"
+              value={data.age} 
+              onChange={e => setData({...data, age: e.target.value})}
+              onKeyDown={e => handleKeyDown(e)}
+            />
+          </FormGroup>
+          
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-gray-400 pr-2">جنسیت</label>
+            <div className="flex bg-gray-50 p-1 rounded-2xl border-2 border-transparent h-[58px]">
+              <button 
+                type="button"
+                onClick={() => setData({...data, gender: 'male'})}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-xl text-xs font-bold transition-all ${data.gender === 'male' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-400'}`}
+              >
+                مرد
+              </button>
+              <button 
+                type="button"
+                onClick={() => setData({...data, gender: 'female'})}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-xl text-xs font-bold transition-all ${data.gender === 'female' ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-400'}`}
+              >
+                زن
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button 
+            type="submit" 
+            disabled={!isFormValid} 
+            className="flex-[2] bg-indigo-700 text-white p-5 rounded-2xl font-bold shadow-xl shadow-indigo-100 disabled:opacity-50 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <Check className="w-5 h-5" /> تأیید و شروع نسخه
+          </button>
+          <button 
+            type="button" 
+            onClick={onCancel} 
+            className="flex-1 bg-gray-100 text-gray-500 p-5 rounded-2xl font-bold transition-all hover:bg-gray-200"
+          >
+            انصراف
+          </button>
         </div>
       </form>
     </div>
   );
 };
 
-const FormGroup: React.FC<{ label: string, children: React.ReactNode }> = ({ label, children }) => (
+const FormGroup: React.FC<{ label: string, icon?: React.ReactNode, children: React.ReactNode }> = ({ label, icon, children }) => (
   <div className="space-y-1.5">
-    <label className="block text-xs font-bold text-gray-400 pr-2">{label}</label>
+    <label className="flex items-center gap-2 text-xs font-bold text-gray-400 pr-2">
+      {icon} {label}
+    </label>
     {children}
   </div>
 );
@@ -471,12 +582,12 @@ const PrescriptionForm: React.FC<{
     <div className="space-y-6 pb-12 animate-in fade-in">
       <div className="bg-indigo-900 p-6 rounded-[2rem] text-white shadow-xl flex justify-between items-center relative overflow-hidden">
         <div className="absolute right-0 top-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-        <div>
+        <div className="z-10">
           <div className="font-bold text-xl text-right">{patient.name}</div>
-          <div className="text-xs text-indigo-300 font-medium text-right">پسر/دختر {patient.fatherName} | {patient.age} ساله | {patient.code}</div>
+          <div className="text-xs text-indigo-300 font-medium text-right">فرزند {patient.fatherName} | {patient.age} ساله | {patient.code}</div>
         </div>
         {previousPrescriptions.length > 0 && (
-          <button onClick={() => onCopy(previousPrescriptions[0], patient.id)} className="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl text-[10px] flex items-center gap-1.5 font-bold transition-all active:scale-95"><Copy className="w-3.5 h-3.5" /> نسخه قبلی</button>
+          <button onClick={() => onCopy(previousPrescriptions[0], patient.id)} className="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-xl text-[10px] flex items-center gap-1.5 font-bold transition-all active:scale-95 z-10"><Copy className="w-3.5 h-3.5" /> نسخه قبلی</button>
         )}
       </div>
 
@@ -641,6 +752,8 @@ const PrescriptionPrintView: React.FC<{
   patient: Patient,
   onBack: () => void
 }> = ({ settings, prescription, patient, onBack }) => {
+  const [printSize, setPrintSize] = useState<'small' | 'normal' | 'large'>('normal');
+
   const handlePrint = () => window.print();
   const handleShare = async () => {
     const text = `Prescription\nPatient: ${patient.name}\nDiagnosis: ${prescription.diagnosis}\nMeds:\n${prescription.medications.map(m => `- ${m.name} (${m.strength}): ${m.instructions}`).join('\n')}`;
@@ -651,45 +764,82 @@ const PrescriptionPrintView: React.FC<{
     }
   };
 
+  const getFontSizeClass = () => {
+    if (printSize === 'small') return 'text-[12px]';
+    if (printSize === 'large') return 'text-[18px]';
+    return 'text-[14px]';
+  };
+
+  const getContainerPadding = () => {
+    if (printSize === 'small') return 'p-4 print:p-2';
+    if (printSize === 'large') return 'p-16 print:p-8';
+    return 'p-12 print:p-4';
+  };
+
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex gap-3 no-print">
-        <button onClick={handlePrint} className="flex-1 bg-indigo-800 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg"><Printer className="w-5 h-5" /> چاپ نسخه</button>
-        <button onClick={handleShare} className="bg-green-600 text-white p-5 rounded-2xl shadow-lg"><Share2 className="w-5 h-5" /></button>
-        <button onClick={onBack} className="p-5 bg-gray-200 rounded-2xl text-gray-600"><ChevronRight /></button>
+    <div className="space-y-6 pb-20 no-print-container">
+      <div className="flex flex-col gap-4 no-print bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="flex justify-between items-center">
+          <span className="font-bold text-gray-700 flex items-center gap-2"><Type className="w-4 h-4" /> تنظیم اندازه چاپ:</span>
+          <div className="flex bg-gray-100 p-1 rounded-xl">
+            <button 
+              onClick={() => setPrintSize('small')} 
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printSize === 'small' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
+            >
+              خرد (A5)
+            </button>
+            <button 
+              onClick={() => setPrintSize('normal')} 
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printSize === 'normal' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
+            >
+              متوسط
+            </button>
+            <button 
+              onClick={() => setPrintSize('large')} 
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${printSize === 'large' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
+            >
+              کلان (A4)
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={handlePrint} className="flex-1 bg-indigo-800 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-900 transition-all"><Printer className="w-5 h-5" /> چاپ نسخه</button>
+          <button onClick={handleShare} className="bg-green-600 text-white p-5 rounded-2xl shadow-lg hover:bg-green-700 transition-all"><Share2 className="w-5 h-5" /></button>
+          <button onClick={onBack} className="p-5 bg-gray-200 rounded-2xl text-gray-600 hover:bg-gray-300 transition-all"><ChevronRight /></button>
+        </div>
       </div>
 
-      <div className="bg-white p-12 border border-gray-200 shadow-2xl min-h-[950px] flex flex-col relative print:shadow-none print:border-none print:p-0 print:min-h-0">
-        <div className="border-b-4 border-indigo-900 pb-6 mb-8 flex justify-between items-center">
+      <div className={`bg-white border border-gray-200 shadow-2xl flex flex-col relative print:shadow-none print:border-none print:m-0 ${getContainerPadding()} ${getFontSizeClass()} ${printSize === 'small' ? 'min-h-[600px]' : 'min-h-[950px]'}`}>
+        <div className="border-b-4 border-indigo-900 pb-4 mb-6 flex justify-between items-center print:pb-2 print:mb-4">
           <div className="text-right">
-            <h1 className="text-2xl font-black text-indigo-900 leading-tight">{settings.name}</h1>
-            <h2 className="text-xl font-bold text-gray-800 mt-1">{settings.doctor}</h2>
+            <h1 className={`${printSize === 'small' ? 'text-xl' : 'text-2xl'} font-black text-indigo-900 leading-tight`}>{settings.name}</h1>
+            <h2 className={`${printSize === 'small' ? 'text-lg' : 'text-xl'} font-bold text-gray-800 mt-1`}>{settings.doctor}</h2>
             <p className="text-sm text-indigo-600 font-bold mt-1">{settings.specialty}</p>
           </div>
           <div className="text-left flex flex-col items-end gap-1.5">
-            <div className="bg-indigo-900 text-white px-4 py-1.5 rounded-lg font-black text-xs tracking-tighter">MEDICAL PRESCRIPTION</div>
+            <div className="bg-indigo-900 text-white px-4 py-1.5 rounded-lg font-black text-[10px] tracking-tighter">MEDICAL PRESCRIPTION</div>
             <p className="text-[10px] text-gray-400 font-mono">Date: {new Date(prescription.date).toLocaleDateString('fa-AF')}</p>
             <p className="text-[10px] text-gray-400 font-mono">Serial: {patient.code}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-6 bg-gray-50 p-6 rounded-[2rem] mb-10 border border-gray-100">
-           <InfoItem label="نام مریض (Patient)" value={patient.name} />
-           <InfoItem label="سن (Age)" value={patient.age} />
-           <InfoItem label="جنسیت (Gender)" value={patient.gender === 'male' ? 'M' : 'F'} />
-           <InfoItem label="نمبر تماس (Phone)" value={patient.phone} />
+        <div className={`grid grid-cols-4 gap-6 bg-gray-50 rounded-[2rem] border border-gray-100 print:rounded-2xl ${printSize === 'small' ? 'p-3 mb-6 gap-2' : 'p-6 mb-10'}`}>
+           <InfoItem label="نام مریض (Patient)" value={patient.name} compact={printSize === 'small'} />
+           <InfoItem label="سن (Age)" value={patient.age} compact={printSize === 'small'} />
+           <InfoItem label="جنسیت (Gender)" value={patient.gender === 'male' ? 'M' : 'F'} compact={printSize === 'small'} />
+           <InfoItem label="نمبر تماس (Phone)" value={patient.phone} compact={printSize === 'small'} />
         </div>
 
-        <div className="flex gap-10 flex-1">
-          <div className="w-28 space-y-10 pt-10 border-l-2 border-dashed border-gray-100 flex flex-col items-center">
-             <SidebarRecord icon={<Heart className="w-4 h-4" />} label="BP" value={prescription.clinicalRecords.bp} />
-             <SidebarRecord icon={<Activity className="w-4 h-4" />} label="HR" value={prescription.clinicalRecords.hr} />
-             <SidebarRecord icon={<Activity className="w-4 h-4" />} label="PR" value={prescription.clinicalRecords.pr} />
-             <SidebarRecord icon={<Activity className="w-4 h-4" />} label="SpO2" value={prescription.clinicalRecords.spo2} />
-             <SidebarRecord icon={<Thermometer className="w-4 h-4" />} label="T°" value={prescription.clinicalRecords.temp} />
+        <div className="flex gap-10 flex-1 print:gap-4">
+          <div className={`w-28 border-l-2 border-dashed border-gray-100 flex flex-col items-center print:w-20 ${printSize === 'small' ? 'space-y-4 pt-4' : 'space-y-10 pt-10'}`}>
+             <SidebarRecord icon={<Heart className="w-4 h-4" />} label="BP" value={prescription.clinicalRecords.bp} compact={printSize === 'small'} />
+             <SidebarRecord icon={<Activity className="w-4 h-4" />} label="HR" value={prescription.clinicalRecords.hr} compact={printSize === 'small'} />
+             <SidebarRecord icon={<Activity className="w-4 h-4" />} label="PR" value={prescription.clinicalRecords.pr} compact={printSize === 'small'} />
+             <SidebarRecord icon={<Activity className="w-4 h-4" />} label="SpO2" value={prescription.clinicalRecords.spo2} compact={printSize === 'small'} />
+             <SidebarRecord icon={<Thermometer className="w-4 h-4" />} label="T°" value={prescription.clinicalRecords.temp} compact={printSize === 'small'} />
           </div>
 
-          <div className="flex-1 relative pt-4">
+          <div className="flex-1 relative pt-4 print:pt-0">
             <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none">
                <svg width="450" height="450" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
                  <path d="M12 2C7.03 2 3 6.03 3 11s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zM12 18c-3.86 0-7-3.14-7-7s3.14-7 7-7 7 3.14 7 7-3.14 7-7 7z" />
@@ -698,23 +848,23 @@ const PrescriptionPrintView: React.FC<{
 
             <div className="mb-4 text-right">
               <h3 className="text-[10px] font-black text-gray-300 uppercase mb-1 tracking-widest">CC (Chief Complaint):</h3>
-              <p className="text-lg font-bold text-gray-800 border-r-4 border-indigo-400 pr-4 leading-tight">{prescription.cc || 'N/A'}</p>
+              <p className={`${printSize === 'small' ? 'text-md' : 'text-lg'} font-bold text-gray-800 border-r-4 border-indigo-400 pr-4 leading-tight`}>{prescription.cc || 'N/A'}</p>
             </div>
 
-            <div className="mb-10 text-right">
+            <div className="mb-10 text-right print:mb-6">
               <h3 className="text-[10px] font-black text-gray-300 uppercase mb-2 tracking-widest">Diagnosis:</h3>
-              <p className="text-xl font-black text-gray-800 border-r-4 border-indigo-600 pr-4 leading-relaxed">{prescription.diagnosis}</p>
+              <p className={`${printSize === 'small' ? 'text-lg' : 'text-xl'} font-black text-gray-800 border-r-4 border-indigo-600 pr-4 leading-relaxed`}>{prescription.diagnosis}</p>
             </div>
 
-            <div className="text-6xl font-serif text-indigo-900 italic opacity-20 mb-8 select-none text-right">Rx</div>
+            <div className={`${printSize === 'small' ? 'text-4xl' : 'text-6xl'} font-serif text-indigo-900 italic opacity-20 mb-8 select-none text-right print:mb-4`}>Rx</div>
             
-            <div className="space-y-8">
+            <div className={`${printSize === 'small' ? 'space-y-4' : 'space-y-8'}`}>
               {prescription.medications.map((m, idx) => (
                 <div key={idx} className="flex gap-5 flex-row-reverse">
                   <span className="text-gray-300 font-black text-lg">{idx + 1}.</span>
                   <div className="flex-1 text-right">
                     <div className="flex flex-row-reverse justify-between items-baseline border-b-2 border-gray-50 pb-2">
-                       <span className="text-xl font-black text-gray-900">{m.name}</span>
+                       <span className={`${printSize === 'small' ? 'text-md' : 'text-xl'} font-black text-gray-900`}>{m.name}</span>
                        <span className="text-sm font-black text-indigo-700">{m.strength}</span>
                     </div>
                     <div className="flex flex-row-reverse justify-between mt-2">
@@ -727,7 +877,7 @@ const PrescriptionPrintView: React.FC<{
             </div>
 
             {prescription.drawingData && (
-              <div className="mt-16 bg-gray-50/50 rounded-3xl p-4 border border-gray-100 border-dashed">
+              <div className={`${printSize === 'small' ? 'mt-6' : 'mt-16'} bg-gray-50/50 rounded-3xl p-4 border border-gray-100 border-dashed print:mt-10`}>
                 <p className="text-[8px] text-gray-300 uppercase mb-2 text-right">Clinical Sketch</p>
                 <img src={prescription.drawingData} className="max-w-full h-auto rounded-xl opacity-90 mx-auto" alt="Clinic Note" />
               </div>
@@ -735,7 +885,7 @@ const PrescriptionPrintView: React.FC<{
           </div>
         </div>
 
-        <div className="mt-auto pt-10 border-t-2 border-gray-100 flex justify-between items-end">
+        <div className="mt-auto pt-10 border-t-2 border-gray-100 flex justify-between items-end print:pt-6">
           <div className="text-[10px] text-gray-400 max-w-[300px] space-y-1.5 text-right">
              <p className="font-black text-gray-600 uppercase tracking-tighter">آدرس کلینیک و تماس</p>
              <p className="font-bold text-gray-500 leading-tight">{settings.address}</p>
@@ -752,18 +902,18 @@ const PrescriptionPrintView: React.FC<{
   );
 };
 
-const InfoItem: React.FC<{ label: string, value: string }> = ({ label, value }) => (
+const InfoItem: React.FC<{ label: string, value: string, compact?: boolean }> = ({ label, value, compact }) => (
   <div className="text-right">
-    <span className="text-[9px] text-gray-300 font-bold block mb-1 uppercase">{label}</span>
-    <span className="text-sm font-bold text-gray-800 block truncate">{value || '-'}</span>
+    <span className={`${compact ? 'text-[8px]' : 'text-[9px]'} text-gray-300 font-bold block mb-1 uppercase`}>{label}</span>
+    <span className={`${compact ? 'text-xs' : 'text-sm'} font-bold text-gray-800 block truncate`}>{value || '-'}</span>
   </div>
 );
 
-const SidebarRecord: React.FC<{ icon: React.ReactNode, label: string, value: string }> = ({ icon, label, value }) => (
-  <div className="flex flex-col items-center gap-1 text-center">
+const SidebarRecord: React.FC<{ icon: React.ReactNode, label: string, value: string, compact?: boolean }> = ({ icon, label, value, compact }) => (
+  <div className={`flex flex-col items-center text-center ${compact ? 'gap-0.5' : 'gap-1'}`}>
     <div className="text-indigo-300 mb-1">{icon}</div>
-    <span className="text-[9px] font-bold text-gray-300 uppercase tracking-tighter">{label}</span>
-    <span className="text-xs font-black text-gray-900 mt-0.5">{value || '--'}</span>
+    <span className={`${compact ? 'text-[7px]' : 'text-[9px]'} font-bold text-gray-300 uppercase tracking-tighter`}>{label}</span>
+    <span className={`${compact ? 'text-[10px]' : 'text-xs'} font-black text-gray-900 mt-0.5`}>{value || '--'}</span>
   </div>
 );
 
