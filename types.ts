@@ -1,3 +1,4 @@
+
 export interface Patient {
   id: string;
   code: string;
@@ -38,9 +39,18 @@ export interface Prescription {
 
 export interface DrugTemplate {
   id: string;
-  name: string;
+  name: string; // Generic Name
+  brandNames?: string; // e.g., Panadol, Calpol
+  form: string; // e.g., Tablet, Syrup, Injection
   defaultStrength: string;
   defaultInstructions: string;
+  category?: string;
+}
+
+export interface DiagnosisTemplate {
+  code: string;
+  title: string;
+  category: string;
 }
 
 export interface ClinicSettings {
