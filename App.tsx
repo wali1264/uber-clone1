@@ -8,7 +8,7 @@ import {
   Search, 
   Printer, 
   Share2, 
-  ChevronRight,
+  ChevronRight, 
   ChevronLeft,
   Home,
   Trash2,
@@ -32,17 +32,44 @@ import {
   ChevronDown,
   Pill,
   Bookmark,
-  BriefcaseMedical
+  BriefcaseMedical,
+  Languages,
+  FileBox,
+  Maximize2
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings, DiagnosisTemplate } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS, ICD_DIAGNOSES } from './constants';
 
+// --- IndexedDB Helper for Unlimited Storage ---
+const DB_NAME = 'AsanNoskhaDB';
+const DB_VERSION = 2; // Updated version for new schema
+const DRUG_STORE = 'drugs';
+
+const initDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = (e.target as IDBOpenDBRequest).result;
+      if (db.objectStoreNames.contains(DRUG_STORE)) {
+        db.deleteObjectStore(DRUG_STORE);
+      }
+      const store = db.createObjectStore(DRUG_STORE, { keyPath: 'id' });
+      store.createIndex('name', 'name', { unique: false });
+      store.createIndex('brandNames', 'brandNames', { unique: false });
+      store.createIndex('category', 'category', { unique: false });
+      store.createIndex('barcode', 'barcode', { unique: false });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
 const COMMON_CC = [
-  { cat: 'عمومی', items: ['تب', 'سردرد', 'درد بدن', 'ضعف عمومی', 'بی‌اشتهایی'] },
-  { cat: 'تنفسی', items: ['سرفه', 'تنگی نفس', 'گلودرد', 'زکام / ریزش بینی'] },
-  { cat: 'گوارشی', items: ['درد شکم', 'اسهال', 'قبضیت', 'تهوع', 'استفراغ'] },
-  { cat: 'قلبی', items: ['درد قفسه سینه', 'تپش قلب', 'فشار خون بلند', 'فشار خون پایین'] },
-  { cat: 'عصبی', items: ['سرگیجه', 'بی‌حسی اندام', 'تشنج', 'اضطراب'] }
+  { cat: 'General', items: ['Fever', 'Headache', 'Body Ache', 'General Weakness', 'Anorexia', 'Weight Loss'] },
+  { cat: 'Respiratory', items: ['Cough', 'Shortness of Breath', 'Sore Throat', 'Flu / Nasal Discharge', 'Chest Tightness'] },
+  { cat: 'Gastrointestinal', items: ['Abdominal Pain', 'Diarrhea', 'Constipation', 'Nausea', 'Vomiting', 'Heartburn'] },
+  { cat: 'Cardiovascular', items: ['Chest Pain', 'Palpitations', 'Hypertension', 'Hypotension', 'Edema'] },
+  { cat: 'Neurological', items: ['Dizziness', 'Numbness', 'Seizures', 'Anxiety', 'Insomnia', 'Tremor'] }
 ];
 
 const App: React.FC = () => {
@@ -51,35 +78,54 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('HOME');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
-  const [drugTemplates, setDrugTemplates] = useState<DrugTemplate[]>([]);
   const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(DEFAULT_CLINIC_SETTINGS);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // DB Instance for drug templates
+  const [db, setDb] = useState<IDBDatabase | null>(null);
 
   // Initial Load
   useEffect(() => {
-    const savedPatients = localStorage.getItem('patients');
-    const savedPrescriptions = localStorage.getItem('prescriptions');
-    const savedDrugs = localStorage.getItem('drugTemplates');
-    const savedSettings = localStorage.getItem('clinicSettings');
-    const savedLogin = sessionStorage.getItem('isLoggedIn');
+    const loadData = async () => {
+      const savedPatients = localStorage.getItem('patients');
+      const savedPrescriptions = localStorage.getItem('prescriptions');
+      const savedSettings = localStorage.getItem('clinicSettings');
+      const savedLogin = sessionStorage.getItem('isLoggedIn');
 
-    if (savedPatients) setPatients(JSON.parse(savedPatients));
-    if (savedPrescriptions) setPrescriptions(JSON.parse(savedPrescriptions));
-    if (savedDrugs) setDrugTemplates(JSON.parse(savedDrugs));
-    else setDrugTemplates(INITIAL_DRUGS);
-    if (savedSettings) setClinicSettings(JSON.parse(savedSettings));
-    if (savedLogin === 'true') setIsLoggedIn(true);
+      if (savedPatients) setPatients(JSON.parse(savedPatients));
+      if (savedPrescriptions) setPrescriptions(JSON.parse(savedPrescriptions));
+      if (savedSettings) setClinicSettings(JSON.parse(savedSettings));
+      if (savedLogin === 'true') setIsLoggedIn(true);
+
+      // Initialize IndexedDB
+      try {
+        const database = await initDB();
+        setDb(database);
+        
+        // Seed DB if empty
+        const countRequest = database.transaction(DRUG_STORE).objectStore(DRUG_STORE).count();
+        countRequest.onsuccess = () => {
+          if (countRequest.result === 0) {
+            const tx = database.transaction(DRUG_STORE, 'readwrite');
+            const store = tx.objectStore(DRUG_STORE);
+            INITIAL_DRUGS.forEach(d => store.add(d));
+          }
+        };
+      } catch (err) {
+        console.error("DB Init failed", err);
+      }
+    };
+    loadData();
   }, []);
 
-  // Auto-save
+  // Auto-save (other than drugs which are saved directly to DB)
   useEffect(() => {
     localStorage.setItem('patients', JSON.stringify(patients));
     localStorage.setItem('prescriptions', JSON.stringify(prescriptions));
-    localStorage.setItem('drugTemplates', JSON.stringify(drugTemplates));
     localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
-  }, [patients, prescriptions, drugTemplates, clinicSettings]);
+  }, [patients, prescriptions, clinicSettings]);
 
   const handleLogin = () => {
     if (pin === '0796606605') {
@@ -108,7 +154,6 @@ const App: React.FC = () => {
     );
   }, [patients, searchQuery]);
 
-  // Derived state for safe patient selection
   const currentSelectedPatient = useMemo(() => 
     patients.find(p => p.id === selectedPatientId), 
   [patients, selectedPatientId]);
@@ -289,10 +334,10 @@ const App: React.FC = () => {
 
         {view === 'NEW_PATIENT' && <PatientForm onSubmit={handleAddPatient} onCancel={() => setView('HOME')} />}
 
-        {view === 'NEW_PRESCRIPTION' && selectedPatientId && (
+        {view === 'NEW_PRESCRIPTION' && selectedPatientId && db && (
           <PrescriptionForm 
+            db={db}
             patient={currentSelectedPatient || patients.find(p => p.id === selectedPatientId) || patients[0]}
-            drugTemplates={drugTemplates}
             previousPrescriptions={prescriptions.filter(pr => pr.patientId === selectedPatientId)}
             onSubmit={handleAddPrescription}
             onCancel={() => setView('PATIENTS')}
@@ -327,7 +372,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {view === 'DRUGS' && <DrugSettings drugTemplates={drugTemplates} setDrugTemplates={setDrugTemplates} />}
+        {view === 'DRUGS' && db && <DrugSettings db={db} />}
         
         {view === 'SETTINGS' && <ClinicSettingsForm settings={clinicSettings} onSave={setClinicSettings} onBack={() => setView('HOME')} />}
 
@@ -472,13 +517,13 @@ const FormGroup: React.FC<{ label: string, icon?: React.ReactNode, children: Rea
 );
 
 const PrescriptionForm: React.FC<{
+  db: IDBDatabase,
   patient: Patient,
-  drugTemplates: DrugTemplate[],
   previousPrescriptions: Prescription[],
   onSubmit: (p: any) => void,
   onCancel: () => void,
   onCopy: (old: Prescription, newId: string) => void
-}> = ({ patient, drugTemplates, previousPrescriptions, onSubmit, onCancel, onCopy }) => {
+}> = ({ db, patient, previousPrescriptions, onSubmit, onCancel, onCopy }) => {
   const [cc, setCc] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [diagSearch, setDiagSearch] = useState('');
@@ -525,7 +570,7 @@ const PrescriptionForm: React.FC<{
                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                <input 
                  className="w-full bg-gray-50 p-2 pr-9 rounded-xl text-xs text-right outline-none focus:ring-1 focus:ring-indigo-300 transition-all" 
-                 placeholder="جستجوی شکایت..." 
+                 placeholder="Search Complaint (English)..." 
                  value={ccSearch}
                  onChange={e => setCcSearch(e.target.value)}
                />
@@ -535,10 +580,10 @@ const PrescriptionForm: React.FC<{
                 <div key={cat.cat} className="space-y-2">
                   <div className="text-[8px] font-black text-gray-300 uppercase text-right border-b border-gray-50 pb-1">{cat.cat}</div>
                   <div className="flex flex-wrap flex-row-reverse gap-1.5">
-                    {cat.items.filter(i => i.includes(ccSearch)).map(item => (
+                    {cat.items.filter(i => i.toLowerCase().includes(ccSearch.toLowerCase())).map(item => (
                       <button 
                         key={item} 
-                        onClick={() => { setCc(prev => prev ? `${prev}، ${item}` : item); setShowCcList(false); }}
+                        onClick={() => { setCc(prev => prev ? `${prev}, ${item}` : item); setShowCcList(false); }}
                         className="text-[10px] font-bold bg-white border border-gray-100 px-3 py-1.5 rounded-full hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
                       >
                         {item}
@@ -553,7 +598,7 @@ const PrescriptionForm: React.FC<{
 
         <input 
           className="w-full p-4 bg-gray-50 border-none rounded-2xl text-right text-sm focus:ring-2 focus:ring-indigo-400 shadow-inner font-bold text-indigo-900" 
-          placeholder="شکایت مریض را اینجا بنویسید یا انتخاب کنید..." 
+          placeholder="Chief Complaint (e.g. Fever, Cough...)" 
           value={cc}
           onChange={e => setCc(e.target.value)}
         />
@@ -570,7 +615,6 @@ const PrescriptionForm: React.FC<{
         </div>
       </div>
 
-      {/* --- OFFLINE DIAGNOSIS SEARCH SYSTEM --- */}
       <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm relative z-20">
         <div className="flex justify-between items-center mb-4">
            <div className="flex items-center gap-1.5 text-indigo-700 bg-indigo-50 px-2 py-1 rounded-lg">
@@ -662,7 +706,7 @@ const PrescriptionForm: React.FC<{
       </div>
 
       {showDrugList && (
-        <DrugModal templates={drugTemplates} onAdd={(t) => {
+        <DrugModal db={db} onAdd={(t) => {
           setMeds([...meds, { 
             id: Math.random().toString(),
             name: t ? `${t.name}${t.brandNames ? ` (${t.brandNames.split(',')[0]})` : ''}` : '', 
@@ -677,17 +721,42 @@ const PrescriptionForm: React.FC<{
   );
 };
 
-const DrugModal: React.FC<{ templates: DrugTemplate[], onAdd: (t?: DrugTemplate) => void, onClose: () => void }> = ({ templates, onAdd, onClose }) => {
+const DrugModal: React.FC<{ db: IDBDatabase, onAdd: (t?: DrugTemplate) => void, onClose: () => void }> = ({ db, onAdd, onClose }) => {
   const [q, setQ] = useState('');
-  
-  const filteredTemplates = useMemo(() => {
-    const query = q.toLowerCase();
-    return templates.filter(t => 
-      t.name.toLowerCase().includes(query) || 
-      t.brandNames?.toLowerCase().includes(query) ||
-      t.category?.toLowerCase().includes(query)
-    );
-  }, [templates, q]);
+  const [results, setResults] = useState<DrugTemplate[]>([]);
+
+  useEffect(() => {
+    const searchInDB = async () => {
+      const tx = db.transaction(DRUG_STORE, 'readonly');
+      const store = tx.objectStore(DRUG_STORE);
+      const query = q.toLowerCase();
+      
+      const found: DrugTemplate[] = [];
+      const cursorRequest = store.openCursor();
+      
+      cursorRequest.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor && found.length < 50) {
+          const val = cursor.value as DrugTemplate;
+          if (
+            val.name.toLowerCase().includes(query) || 
+            val.brandNames?.toLowerCase().includes(query) ||
+            val.category?.toLowerCase().includes(query) ||
+            val.barcode?.toLowerCase().includes(query) ||
+            val.company?.toLowerCase().includes(query)
+          ) {
+            found.push(val);
+          }
+          cursor.continue();
+        } else {
+          setResults(found);
+        }
+      };
+    };
+    
+    const timeout = setTimeout(searchInDB, 150);
+    return () => clearTimeout(timeout);
+  }, [q, db]);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in">
@@ -704,7 +773,7 @@ const DrugModal: React.FC<{ templates: DrugTemplate[], onAdd: (t?: DrugTemplate)
            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
            <input 
              className="w-full bg-gray-50 p-4 pr-12 rounded-2xl text-right outline-none focus:ring-2 focus:ring-indigo-500 font-bold transition-all" 
-             placeholder="جستجو (Generic یا Brand)..." 
+             placeholder="جستجو در بین میلیون‌ها دوا..." 
              value={q} 
              onChange={e => setQ(e.target.value)}
              autoFocus
@@ -716,7 +785,7 @@ const DrugModal: React.FC<{ templates: DrugTemplate[], onAdd: (t?: DrugTemplate)
         </button>
 
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-          {filteredTemplates.map(t => (
+          {results.map(t => (
             <div key={t.id} onClick={() => onAdd(t)} className="p-5 border border-gray-100 rounded-[1.5rem] hover:bg-indigo-50 cursor-pointer transition-all active:scale-[0.98] flex flex-col gap-2 text-right group">
               <div className="flex justify-between items-start flex-row-reverse">
                  <div className="font-black text-gray-900 group-hover:text-indigo-700 text-lg">{t.name}</div>
@@ -725,10 +794,11 @@ const DrugModal: React.FC<{ templates: DrugTemplate[], onAdd: (t?: DrugTemplate)
               <div className="flex items-center justify-end gap-2 text-xs text-gray-400 font-medium">
                  {t.brandNames && <div className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded italic">Brands: {t.brandNames}</div>}
                  <div className="flex items-center gap-1 bg-gray-100 px-2 py-0.5 rounded text-[10px] font-bold text-gray-500">{t.form}</div>
+                 {t.company && <div className="text-[9px] text-indigo-400 font-bold">Mfg: {t.company}</div>}
               </div>
             </div>
           ))}
-          {filteredTemplates.length === 0 && (
+          {results.length === 0 && (
              <div className="text-center py-10 text-gray-400 italic">موردی یافت نشد.</div>
           )}
         </div>
@@ -744,54 +814,200 @@ const RecordInput: React.FC<{ label: string, value: string, placeholder?: string
   </div>
 );
 
+type Language = 'en' | 'dr' | 'ps';
+type PaperSize = 'A4' | 'A5' | 'Custom';
+
+const TRANSLATIONS: Record<Language, any> = {
+  en: {
+    dir: 'ltr',
+    header: 'PRESCRIPTION',
+    date: 'Date',
+    code: 'Code',
+    name: 'Patient Name',
+    age: 'Age',
+    gender: 'Gender',
+    phone: 'Phone',
+    cc: 'Chief Complaint (CC)',
+    diagnosis: 'Diagnosis',
+    qty: 'Qty',
+    address: 'Address & Contact',
+    signature: "Doctor's Signature",
+    male: 'Male',
+    female: 'Female'
+  },
+  dr: {
+    dir: 'rtl',
+    header: 'نسخه طبی',
+    date: 'تاریخ',
+    code: 'کد',
+    name: 'نام مریض',
+    age: 'سن',
+    gender: 'جنسیت',
+    phone: 'موبایل',
+    cc: 'شکایه اصلی (CC)',
+    diagnosis: 'تشخیص',
+    qty: 'تعداد',
+    address: 'آدرس و تماس',
+    signature: 'امضای داکتر',
+    male: 'مرد',
+    female: 'زن'
+  },
+  ps: {
+    dir: 'rtl',
+    header: 'نسخه',
+    date: 'نیټه',
+    code: 'کوډ',
+    name: 'د ناروغ نوم',
+    age: 'عمر',
+    gender: 'جنسیت',
+    phone: 'تلیفون',
+    cc: 'اصلي شکایت (CC)',
+    diagnosis: 'تشخیص',
+    qty: 'شمیر',
+    address: 'پته او اړیکه',
+    signature: 'د ډاکټر لاسلیک',
+    male: 'نارینه',
+    female: 'ښځینه'
+  }
+};
+
 const PrescriptionPrintView: React.FC<{
   settings: ClinicSettings,
   prescription: Prescription,
   patient: Patient,
   onBack: () => void
 }> = ({ settings, prescription, patient, onBack }) => {
-  const [printSize, setPrintSize] = useState<'small' | 'normal' | 'large'>('normal');
+  const [fontSize, setFontSize] = useState(14);
+  const [lang, setLang] = useState<Language>('dr');
+  const [paperSize, setPaperSize] = useState<PaperSize>('A4');
+  const [customWidth, setCustomWidth] = useState(210);
+  const [customHeight, setCustomHeight] = useState(297);
+  const t = TRANSLATIONS[lang];
 
   return (
     <div className="space-y-6 pb-20 no-print-container">
       <div className="flex flex-col gap-4 no-print bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-        <div className="flex justify-between items-center">
-          <span className="font-bold text-gray-700 flex items-center gap-2"><Type className="w-4 h-4" /> تنظیم اندازه:</span>
+        <div className="flex justify-between items-center flex-row-reverse">
+          <span className="font-bold text-gray-700 flex items-center gap-2 flex-row-reverse"><Type className="w-4 h-4" /> اندازه قلم: {fontSize}px</span>
+          <div className="flex items-center gap-2">
+            <input 
+              type="range" 
+              min="10" 
+              max="40" 
+              step="1"
+              value={fontSize} 
+              onChange={(e) => setFontSize(parseInt(e.target.value))}
+              className="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+            />
+            <div className="flex items-center gap-1 bg-gray-50 border rounded-xl px-2 py-1">
+              <span className="text-[10px] text-gray-400">اندازه دلخواه:</span>
+              <input 
+                type="number" 
+                value={fontSize} 
+                onChange={(e) => setFontSize(parseInt(e.target.value) || 10)}
+                className="w-12 bg-transparent text-center text-xs font-bold outline-none"
+              />
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex justify-between items-center flex-row-reverse">
+          <span className="font-bold text-gray-700 flex items-center gap-2 flex-row-reverse"><Languages className="w-4 h-4" /> انتخاب زبان نسخه:</span>
           <div className="flex bg-gray-100 p-1 rounded-xl">
-            {['small', 'normal', 'large'].map(s => (
-              <button key={s} onClick={() => setPrintSize(s as any)} className={`px-4 py-2 rounded-lg text-xs font-bold ${printSize === s ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500'}`}>{s === 'small' ? 'خرد' : s === 'large' ? 'کلان' : 'متوسط'}</button>
+            {(['en', 'dr', 'ps'] as Language[]).map(l => (
+              <button 
+                key={l} 
+                onClick={() => setLang(l)} 
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${lang === l ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
+              >
+                {l === 'en' ? 'English' : l === 'dr' ? 'دری' : 'پښتو'}
+              </button>
             ))}
           </div>
         </div>
-        <div className="flex gap-3">
-          <button onClick={() => window.print()} className="flex-1 bg-indigo-800 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg"><Printer className="w-5 h-5" /> چاپ نسخه</button>
-          <button onClick={onBack} className="p-5 bg-gray-200 rounded-2xl text-gray-600"><ChevronRight /></button>
+
+        <div className="flex flex-col gap-3">
+          <div className="flex justify-between items-center flex-row-reverse">
+            <span className="font-bold text-gray-700 flex items-center gap-2 flex-row-reverse"><FileBox className="w-4 h-4" /> اندازه کاغذ:</span>
+            <div className="flex bg-gray-100 p-1 rounded-xl">
+              {(['A4', 'A5', 'Custom'] as PaperSize[]).map(size => (
+                <button 
+                  key={size} 
+                  onClick={() => setPaperSize(size)} 
+                  className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${paperSize === size ? 'bg-indigo-800 text-white shadow-md' : 'text-gray-500 hover:bg-gray-200'}`}
+                >
+                  {size === 'Custom' ? 'اندازه دلخواه' : size}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {paperSize === 'Custom' && (
+            <div className="bg-gray-50 p-4 rounded-2xl flex flex-row-reverse items-center justify-between gap-4 border border-indigo-100 animate-in slide-in-from-top-2">
+              <span className="text-[10px] font-bold text-indigo-700 flex items-center gap-1 flex-row-reverse"><Maximize2 className="w-3 h-3" /> تنظیم ابعاد کاغذ:</span>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center gap-1">
+                  <label className="text-[9px] text-gray-400 font-bold">عرض (mm)</label>
+                  <input 
+                    type="number" 
+                    value={customWidth} 
+                    onChange={e => setCustomWidth(parseInt(e.target.value) || 0)}
+                    className="w-16 p-2 bg-white border border-gray-200 rounded-lg text-center text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" 
+                  />
+                </div>
+                <X className="w-3 h-3 text-gray-300 mt-4" />
+                <div className="flex flex-col items-center gap-1">
+                  <label className="text-[9px] text-gray-400 font-bold">ارتفاع (mm)</label>
+                  <input 
+                    type="number" 
+                    value={customHeight} 
+                    onChange={e => setCustomHeight(parseInt(e.target.value) || 0)}
+                    className="w-16 p-2 bg-white border border-gray-200 rounded-lg text-center text-xs font-bold focus:ring-1 focus:ring-indigo-500 outline-none" 
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-2">
+          <button onClick={() => window.print()} className="flex-1 bg-indigo-800 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700 transition-all"><Printer className="w-5 h-5" /> چاپ نسخه</button>
+          <button onClick={onBack} className="p-5 bg-gray-200 rounded-2xl text-gray-600 hover:bg-gray-300 transition-all"><ChevronRight /></button>
         </div>
       </div>
 
-      <div className={`bg-white border border-gray-200 shadow-2xl flex flex-col relative print:shadow-none print:border-none p-12 print:p-4 ${printSize === 'small' ? 'min-h-[600px] text-[12px]' : printSize === 'large' ? 'min-h-[950px] text-[18px]' : 'min-h-[850px] text-[14px]'}`}>
-        <div className="border-b-4 border-indigo-900 pb-4 mb-6 flex justify-between items-center">
-          <div className="text-right">
+      <div 
+        dir={t.dir}
+        style={{ 
+          fontSize: `${fontSize}px`,
+          width: paperSize === 'A4' ? '210mm' : paperSize === 'A5' ? '148mm' : `${customWidth}mm`,
+          minHeight: paperSize === 'A4' ? '297mm' : paperSize === 'A5' ? '210mm' : `${customHeight}mm`,
+          margin: '0 auto'
+        }}
+        className="bg-white border border-gray-200 shadow-2xl flex flex-col relative print:shadow-none print:border-none p-12 print:p-4"
+      >
+        <div className={`border-b-4 border-indigo-900 pb-4 mb-6 flex justify-between items-center ${t.dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
+          <div className={t.dir === 'rtl' ? 'text-right' : 'text-left'}>
             <h1 className="text-2xl font-black text-indigo-900 leading-tight">{settings.name}</h1>
             <h2 className="text-xl font-bold text-gray-800 mt-1">{settings.doctor}</h2>
             <p className="text-sm text-indigo-600 font-bold mt-1">{settings.specialty}</p>
           </div>
-          <div className="text-left">
-            <div className="bg-indigo-900 text-white px-4 py-1.5 rounded-lg font-black text-[10px]">PRESCRIPTION</div>
-            <p className="text-[10px] text-gray-400 mt-2">Date: {new Date(prescription.date).toLocaleDateString('fa-AF')}</p>
-            <p className="text-[10px] text-gray-400">Code: {patient.code}</p>
+          <div className={t.dir === 'rtl' ? 'text-left' : 'text-right'}>
+            <div className="bg-indigo-900 text-white px-4 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest">{t.header}</div>
+            <p className="text-[10px] text-gray-400 mt-2">{t.date}: {new Date(prescription.date).toLocaleDateString(lang === 'en' ? 'en-US' : 'fa-AF')}</p>
+            <p className="text-[10px] text-gray-400">{t.code}: {patient.code}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-6 bg-gray-50 p-6 rounded-2xl mb-10 text-right">
-           <InfoItem label="نام مریض" value={patient.name} />
-           <InfoItem label="سن" value={patient.age} />
-           <InfoItem label="جنسیت" value={patient.gender === 'male' ? 'مرد' : 'زن'} />
-           <InfoItem label="موبایل" value={patient.phone} />
+        <div className={`grid grid-cols-4 gap-6 bg-gray-50 p-6 rounded-2xl mb-10 ${t.dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+           <InfoItem label={t.name} value={patient.name} />
+           <InfoItem label={t.age} value={patient.age} />
+           <InfoItem label={t.gender} value={patient.gender === 'male' ? t.male : t.female} />
+           <InfoItem label={t.phone} value={patient.phone} />
         </div>
 
-        <div className="flex gap-10 flex-1">
-          <div className="w-24 border-l-2 border-dashed border-gray-100 flex flex-col items-center space-y-8 pt-6">
+        <div className={`flex gap-10 flex-1 ${t.dir === 'ltr' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <div className={`w-24 border-dashed border-gray-100 flex flex-col items-center space-y-8 pt-6 ${t.dir === 'rtl' ? 'border-l-2' : 'border-r-2'}`}>
              <SidebarRecord icon={<Heart className="w-4 h-4" />} label="BP" value={prescription.clinicalRecords.bp} />
              <SidebarRecord icon={<Activity className="w-4 h-4" />} label="HR" value={prescription.clinicalRecords.hr} />
              <SidebarRecord icon={<Activity className="w-4 h-4" />} label="PR" value={prescription.clinicalRecords.pr} />
@@ -799,28 +1015,28 @@ const PrescriptionPrintView: React.FC<{
              <SidebarRecord icon={<Thermometer className="w-4 h-4" />} label="T°" value={prescription.clinicalRecords.temp} />
           </div>
 
-          <div className="flex-1 text-right pt-4">
+          <div className={`flex-1 pt-4 ${t.dir === 'rtl' ? 'text-right' : 'text-left'}`}>
             <div className="mb-6">
-              <h3 className="text-[10px] font-black text-gray-300 uppercase mb-1 tracking-widest">CC:</h3>
-              <p className="text-lg font-bold text-gray-800 border-r-4 border-indigo-400 pr-4">{prescription.cc || 'N/A'}</p>
+              <h3 className="text-[10px] font-black text-gray-300 uppercase mb-1 tracking-widest">{t.cc}:</h3>
+              <p className={`text-lg font-bold text-gray-800 border-indigo-400 ${t.dir === 'rtl' ? 'border-r-4 pr-4' : 'border-l-4 pl-4'}`}>{prescription.cc || 'N/A'}</p>
             </div>
             <div className="mb-10">
-              <h3 className="text-[10px] font-black text-gray-300 uppercase mb-2 tracking-widest">Diagnosis:</h3>
-              <p className="text-xl font-black text-gray-800 border-r-4 border-indigo-600 pr-4">{prescription.diagnosis}</p>
+              <h3 className="text-[10px] font-black text-gray-300 uppercase mb-2 tracking-widest">{t.diagnosis}:</h3>
+              <p className={`text-xl font-black text-gray-800 border-indigo-600 ${t.dir === 'rtl' ? 'border-r-4 pr-4' : 'border-l-4 pl-4'}`}>{prescription.diagnosis}</p>
             </div>
             <div className="text-6xl font-serif text-indigo-900 italic opacity-20 mb-8 select-none">Rx</div>
             <div className="space-y-6">
               {prescription.medications.map((m, idx) => (
-                <div key={idx} className="flex gap-4 flex-row-reverse border-b-2 border-gray-50 pb-4">
+                <div key={idx} className={`flex gap-4 border-b-2 border-gray-50 pb-4 ${t.dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
                   <span className="text-gray-300 font-black">{idx + 1}.</span>
                   <div className="flex-1">
-                    <div className="flex justify-between items-baseline flex-row-reverse">
+                    <div className={`flex justify-between items-baseline ${t.dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
                        <span className="text-xl font-black text-gray-900">{m.name}</span>
                        <span className="text-sm font-black text-indigo-700">{m.strength}</span>
                     </div>
-                    <div className="flex justify-between mt-2 flex-row-reverse">
+                    <div className={`flex justify-between mt-2 ${t.dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
                        <p className="text-sm text-gray-600 font-medium">{m.instructions}</p>
-                       <span className="text-[10px] text-gray-400 uppercase">Qty: {m.quantity}</span>
+                       <span className="text-[10px] text-gray-400 uppercase">{t.qty}: {m.quantity}</span>
                     </div>
                   </div>
                 </div>
@@ -829,15 +1045,15 @@ const PrescriptionPrintView: React.FC<{
           </div>
         </div>
 
-        <div className="mt-auto pt-10 border-t-2 border-gray-100 flex justify-between items-end">
-          <div className="text-[10px] text-gray-400 max-w-[300px] text-right">
-             <p className="font-black text-gray-600 uppercase">آدرس و تماس</p>
+        <div className={`mt-auto pt-10 border-t-2 border-gray-100 flex justify-between items-end ${t.dir === 'ltr' ? 'flex-row-reverse' : 'flex-row'}`}>
+          <div className={`text-[10px] text-gray-400 max-w-[300px] ${t.dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+             <p className="font-black text-gray-600 uppercase">{t.address}</p>
              <p className="font-bold">{settings.address}</p>
-             <p>تلفن: {settings.phone}</p>
+             <p>{t.phone}: {settings.phone}</p>
           </div>
           <div className="text-center pb-2">
             <div className="w-32 h-0.5 bg-gray-200 mb-2"></div>
-            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Doctor's Signature</p>
+            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{t.signature}</p>
           </div>
         </div>
       </div>
@@ -847,7 +1063,7 @@ const PrescriptionPrintView: React.FC<{
 
 const InfoItem: React.FC<{ label: string, value: string }> = ({ label, value }) => (
   <div>
-    <span className="text-[9px] text-gray-300 font-bold block mb-1 uppercase">{label}</span>
+    <span className="text-[9px] text-gray-300 font-bold block mb-1 uppercase tracking-tighter">{label}</span>
     <span className="text-sm font-bold text-gray-800 block">{value || '-'}</span>
   </div>
 );
@@ -860,8 +1076,64 @@ const SidebarRecord: React.FC<{ icon: React.ReactNode, label: string, value: str
   </div>
 );
 
-const DrugSettings: React.FC<{ drugTemplates: DrugTemplate[], setDrugTemplates: React.Dispatch<React.SetStateAction<DrugTemplate[]>> }> = ({ drugTemplates, setDrugTemplates }) => {
-  const [newDrug, setNewDrug] = useState({ name: '', brandNames: '', form: 'Tablet', strength: '', instructions: '', category: 'General' });
+const DrugSettings: React.FC<{ db: IDBDatabase }> = ({ db }) => {
+  const [newDrug, setNewDrug] = useState({ name: '', brandNames: '', form: 'Tablet', strength: '', instructions: '', category: 'General', company: '', barcode: '' });
+  const [bankSearch, setBankSearch] = useState('');
+  const [drugs, setDrugs] = useState<DrugTemplate[]>([]);
+
+  const fetchDrugs = async (query = '') => {
+    const tx = db.transaction(DRUG_STORE, 'readonly');
+    const store = tx.objectStore(DRUG_STORE);
+    const q = query.toLowerCase();
+    
+    const found: DrugTemplate[] = [];
+    const cursorRequest = store.openCursor();
+    
+    cursorRequest.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor && found.length < 50) {
+        const val = cursor.value as DrugTemplate;
+        if (!q || 
+            val.name.toLowerCase().includes(q) || 
+            val.brandNames?.toLowerCase().includes(q) ||
+            val.barcode?.toLowerCase().includes(q)
+        ) {
+          found.push(val);
+        }
+        cursor.continue();
+      } else {
+        setDrugs(found);
+      }
+    };
+  };
+
+  useEffect(() => {
+    fetchDrugs(bankSearch);
+  }, [bankSearch, db]);
+
+  const handleAdd = () => {
+    if (!newDrug.name) return;
+    const drugToAdd = {
+      id: Math.random().toString(36).substr(2, 9),
+      ...newDrug,
+      defaultStrength: newDrug.strength,
+      defaultInstructions: newDrug.instructions
+    };
+    
+    const tx = db.transaction(DRUG_STORE, 'readwrite');
+    tx.objectStore(DRUG_STORE).add(drugToAdd);
+    tx.oncomplete = () => {
+      setNewDrug({ name: '', brandNames: '', form: 'Tablet', strength: '', instructions: '', category: 'General', company: '', barcode: '' });
+      fetchDrugs(bankSearch);
+    };
+  };
+
+  const handleDelete = (id: string) => {
+    const tx = db.transaction(DRUG_STORE, 'readwrite');
+    tx.objectStore(DRUG_STORE).delete(id);
+    tx.oncomplete = () => fetchDrugs(bankSearch);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in">
       <div className="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-5">
@@ -878,25 +1150,51 @@ const DrugSettings: React.FC<{ drugTemplates: DrugTemplate[], setDrugTemplates: 
                 <option value="Inhaler">Inhaler</option>
                 <option value="Drop">Drop</option>
              </select>
-             <input className="w-full p-4 bg-gray-50 rounded-2xl text-right outline-none" placeholder="دسته (مثلاً Antibiotic)" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
+             <input className="w-full p-4 bg-gray-50 rounded-2xl text-right outline-none" placeholder="کمپانی تولیدکننده" value={newDrug.company} onChange={e => setNewDrug({...newDrug, company: e.target.value})} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+             <input className="w-full p-4 bg-gray-50 rounded-2xl text-right outline-none" placeholder="بارکد / کد دوا" value={newDrug.barcode} onChange={e => setNewDrug({...newDrug, barcode: e.target.value})} />
+             <input className="w-full p-4 bg-gray-50 rounded-2xl text-right outline-none" placeholder="دسته طبی" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <input className="w-full p-4 bg-gray-50 rounded-2xl text-right outline-none" placeholder="دوز پیش‌فرض" value={newDrug.strength} onChange={e => setNewDrug({...newDrug, strength: e.target.value})} />
             <input className="w-full p-4 bg-gray-50 rounded-2xl text-right outline-none" placeholder="هدایات پیش‌فرض" value={newDrug.instructions} onChange={e => setNewDrug({...newDrug, instructions: e.target.value})} />
           </div>
-          <button onClick={() => { if(newDrug.name) { setDrugTemplates(prev => [{id: Math.random().toString(), ...newDrug, defaultStrength: newDrug.strength, defaultInstructions: newDrug.instructions}, ...prev]); setNewDrug({name:'', brandNames:'', form:'Tablet', strength:'', instructions:'', category: 'General'}); } }} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold shadow-lg active:scale-95 transition-all">ثبت در بانک دواها</button>
+          <button onClick={handleAdd} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold shadow-lg active:scale-95 transition-all">ثبت در بانک دواها</button>
         </div>
       </div>
+
       <div className="space-y-3">
-        {drugTemplates.map(t => (
-          <div key={t.id} className="bg-white p-5 rounded-[2rem] flex justify-between items-center shadow-sm flex-row-reverse border border-gray-50">
-            <div className="text-right">
-              <div className="font-black text-indigo-900 text-lg">{t.name} <span className="text-[10px] text-gray-400 font-medium">({t.form})</span></div>
-              <div className="text-xs text-gray-400 mt-1">{t.brandNames ? `Brands: ${t.brandNames}` : t.category}</div>
+        <div className="flex justify-between items-center px-2">
+          <span className="text-[10px] font-bold text-gray-400">جستجو در بانک دواها</span>
+          <h3 className="font-bold text-gray-600 text-right">لیست دواهای ثبت شده</h3>
+        </div>
+        
+        <div className="relative group">
+          <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 group-focus-within:text-indigo-600" />
+          <input 
+            className="w-full p-3 pr-10 bg-white border border-gray-100 rounded-xl text-right text-xs outline-none focus:ring-2 focus:ring-indigo-100 transition-all" 
+            placeholder="جستجو در بانک نامحدود..." 
+            value={bankSearch}
+            onChange={e => setBankSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-3">
+          {drugs.map(t => (
+            <div key={t.id} className="bg-white p-5 rounded-[2rem] flex justify-between items-center shadow-sm flex-row-reverse border border-gray-50 hover:border-indigo-100 transition-all">
+              <div className="text-right">
+                <div className="font-black text-indigo-900 text-lg">{t.name} <span className="text-[10px] text-gray-400 font-medium">({t.form})</span></div>
+                <div className="text-xs text-gray-400 mt-1">{t.brandNames ? `Brands: ${t.brandNames}` : t.category}</div>
+                {t.company && <div className="text-[9px] text-indigo-300 font-bold">Mfg: {t.company}</div>}
+              </div>
+              <button onClick={() => handleDelete(t.id)} className="text-red-200 hover:text-red-500 p-2 transition-colors"><Trash2 className="w-5 h-5" /></button>
             </div>
-            <button onClick={() => setDrugTemplates(prev => prev.filter(x => x.id !== t.id))} className="text-red-200 hover:text-red-500 p-2 transition-colors"><Trash2 className="w-5 h-5" /></button>
-          </div>
-        ))}
+          ))}
+          {drugs.length === 0 && (
+            <div className="text-center py-10 text-gray-300 italic text-sm">موردی برای نمایش وجود ندارد.</div>
+          )}
+        </div>
       </div>
     </div>
   );

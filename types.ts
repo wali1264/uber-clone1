@@ -45,6 +45,8 @@ export interface DrugTemplate {
   defaultStrength: string;
   defaultInstructions: string;
   category?: string;
+  company?: string;
+  barcode?: string;
 }
 
 export interface DiagnosisTemplate {
