@@ -29,7 +29,6 @@ import {
   Calendar,
   Check,
   ChevronDown,
-  ChevronUp,
   Pill,
   Bookmark,
   BriefcaseMedical,
@@ -39,9 +38,7 @@ import {
   Key,
   Star,
   FileDown,
-  Edit,
-  Plus,
-  Minus
+  Edit
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings, DiagnosisTemplate } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS, ICD_DIAGNOSES } from './constants';
@@ -180,12 +177,10 @@ const App: React.FC = () => {
 
   const handleSavePrescription = (pr: Omit<Prescription, 'id' | 'date'> & { id?: string }) => {
     if (pr.id) {
-      // Update existing
       const updatedPr: Prescription = { ...pr, id: pr.id, date: Date.now() } as Prescription;
       setPrescriptions(prev => prev.map(p => p.id === pr.id ? updatedPr : p));
       setSelectedPrescription(updatedPr);
     } else {
-      // Add new
       const newPr: Prescription = { ...pr, id: Math.random().toString(36).substr(2, 9), date: Date.now() } as Prescription;
       setPrescriptions(prev => [newPr, ...prev]);
       setSelectedPrescription(newPr);
@@ -413,7 +408,7 @@ const FormInput: React.FC<{ label: string, value: string, placeholder?: string, 
     <label className="text-[10px] font-bold text-slate-400 pr-1">{label}</label>
     <input 
       type={type}
-      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500 transition-all font-bold"
+      className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs outline-none focus:border-indigo-500 transition-all font-bold"
       value={value}
       placeholder={placeholder}
       onChange={e => onChange(e.target.value)}
@@ -648,15 +643,45 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
   const t = TRANSLATIONS[lang];
 
   const handlePrint = () => {
+    let width = 210;
+    let height = 297;
+    if (paperSize === 'A5') {
+      width = 148;
+      height = 210;
+    } else if (paperSize === 'Custom') {
+      width = customWidth;
+      height = customHeight;
+    }
+
+    const styleId = "print-size-style";
+    let styleEl = document.getElementById(styleId);
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.innerHTML = `
+      @page { size: ${width}mm ${height}mm; margin: 0; }
+      @media print {
+        html, body { margin: 0; padding: 0; width: ${width}mm; height: ${height}mm; }
+        #print {
+          width: ${width}mm;
+          min-height: ${height}mm;
+          position: absolute;
+          top: 0;
+          left: 0;
+          padding: 10mm;
+          margin: 0;
+          background: white !important;
+          box-sizing: border-box;
+        }
+        .no-print, .no-print-container {
+          display: none !important;
+        }
+      }
+    `;
     window.print();
   };
-
-  const PRESET_SIZES = [
-    { name: 'A6', w: 105, h: 148 },
-    { name: 'B5', w: 176, h: 250 },
-    { name: 'Note S', w: 100, h: 150 },
-    { name: 'Note M', w: 148, h: 210 },
-  ];
 
   return (
     <div className="space-y-4 pb-20 no-print-container animate-in fade-in">
@@ -688,38 +713,14 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
         </div>
 
         {paperSize === 'Custom' && (
-          <div className="space-y-3 animate-in slide-in-from-top-1 px-1 border-t pt-2">
-             <div className="flex flex-col gap-1">
-               <span className="text-[9px] font-bold text-slate-400">اندازه‌های پیشنهادی (کلیک کنید):</span>
-               <div className="flex gap-2 overflow-x-auto pb-1">
-                 {PRESET_SIZES.map(sz => (
-                   <button 
-                     key={sz.name} 
-                     onClick={() => { setCustomWidth(sz.w); setCustomHeight(sz.h); }}
-                     className={`px-2 py-1.5 rounded-md text-[9px] font-bold whitespace-nowrap border transition-all ${customWidth === sz.w && customHeight === sz.h ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-indigo-400'}`}
-                   >
-                     {sz.name} ({sz.w}x{sz.h})
-                   </button>
-                 ))}
-               </div>
+          <div className="flex justify-between items-center gap-2 animate-in slide-in-from-top-1">
+             <div className="flex items-center gap-1">
+               <span className="text-[9px] text-slate-400">H:</span>
+               <input type="number" value={customHeight} onChange={e => setCustomHeight(parseInt(e.target.value) || 0)} className="w-12 p-1 border rounded text-center" />
              </div>
-             <div className="flex justify-between items-center gap-2">
-               <div className="flex flex-col items-center gap-1">
-                 <span className="text-[9px] text-slate-400">ارتفاع (mm):</span>
-                 <div className="flex items-center gap-1">
-                   <button onClick={() => setCustomHeight(prev => Math.max(0, prev - 1))} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
-                   <input type="number" value={customHeight} onChange={e => setCustomHeight(parseInt(e.target.value) || 0)} className="w-16 p-1 bg-slate-50 border rounded text-center text-[10px] font-bold outline-none" />
-                   <button onClick={() => setCustomHeight(prev => prev + 1)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronUp className="w-3.5 h-3.5" /></button>
-                 </div>
-               </div>
-               <div className="flex flex-col items-center gap-1">
-                 <span className="text-[9px] text-slate-400">عرض (mm):</span>
-                 <div className="flex items-center gap-1">
-                   <button onClick={() => setCustomWidth(prev => Math.max(0, prev - 1))} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
-                   <input type="number" value={customWidth} onChange={e => setCustomWidth(parseInt(e.target.value) || 0)} className="w-16 p-1 bg-slate-50 border rounded text-center text-[10px] font-bold outline-none" />
-                   <button onClick={() => setCustomWidth(prev => prev + 1)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronUp className="w-3.5 h-3.5" /></button>
-                 </div>
-               </div>
+             <div className="flex items-center gap-1">
+               <span className="text-[9px] text-slate-400">W:</span>
+               <input type="number" value={customWidth} onChange={e => setCustomWidth(parseInt(e.target.value) || 0)} className="w-12 p-1 border rounded text-center" />
              </div>
           </div>
         )}
@@ -729,7 +730,7 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
             onClick={handlePrint} 
             className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
           >
-            <Printer className="w-4 h-4" /> چاپ A4
+            <Printer className="w-4 h-4" /> چاپ نسخه
           </button>
           <button 
             onClick={onEdit} 
@@ -741,24 +742,26 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
         </div>
       </div>
 
-      {/* The guaranteed printArea container */}
       <div 
-        id="printArea"
+        id="print"
         dir="ltr"
         style={{ 
           fontSize: `${fontSize}px`,
-          boxSizing: 'border-box',
+          boxSizing: 'border-box'
         }}
-        className="bg-white border border-slate-200 shadow-xl flex flex-col p-8 text-left print:shadow-none print:border-none"
+        className="bg-white border border-slate-200 shadow-xl flex flex-col p-8 text-left print:p-0 print:shadow-none print:border-none"
       >
-        <div className={`border-b-2 border-slate-800 pb-2 mb-4 flex justify-between items-end flex-row-reverse`}>
-          <div className="text-right">
-            <h1 className="text-lg font-black text-slate-900">{settings.name}</h1>
-            <p className="text-xs font-bold text-indigo-700">{settings.doctor} | {settings.specialty}</p>
-          </div>
+        <div className={`border-b-2 border-slate-800 pb-2 mb-4 flex justify-between items-end flex-row`}>
+          {/* Left Side: Metadata and Branding */}
           <div className="text-left">
             <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase">{t.header}</span>
             <p className="text-[9px] text-slate-400 mt-1">{t.date}: {new Date(prescription.date).toLocaleDateString(lang === 'en' ? 'en-US' : 'fa-AF')}</p>
+          </div>
+          {/* Right Side: Doctor and Clinic Information */}
+          <div className="text-right">
+            <h1 className="text-lg font-black text-slate-900">{settings.name}</h1>
+            <p className="text-xs font-bold text-indigo-700">{settings.doctor}</p>
+            <p className="text-[10px] text-slate-500">{settings.specialty}</p>
           </div>
         </div>
 

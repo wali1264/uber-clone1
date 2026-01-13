@@ -11,11 +11,6 @@
         font-family: 'Vazirmatn', sans-serif;
         background-color: #f8fafc;
       }
-      
-      @page {
-        size: A4;
-        margin: 0;
-      }
 
       @media print {
         body {
@@ -27,23 +22,11 @@
         #root {
           margin: 0 !important;
           padding: 0 !important;
+          display: block !important;
         }
 
         .no-print, .no-print-container {
           display: none !important;
-        }
-
-        #printArea {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 210mm;
-          min-height: 297mm;
-          margin: 0 !important;
-          padding: 10mm; /* User suggested padding for content safety */
-          background: white !important;
-          border: none !important;
-          box-shadow: none !important;
         }
       }
     </style>
