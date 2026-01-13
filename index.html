@@ -11,22 +11,39 @@
         font-family: 'Vazirmatn', sans-serif;
         background-color: #f8fafc;
       }
+      
+      @page {
+        size: A4;
+        margin: 0;
+      }
+
       @media print {
-        @page {
-          size: auto; /* Allows printer to handle A4/A5 */
-          margin: 5mm; /* Minimal margin to bring content to the top */
-        }
-        .no-print {
-          display: none !important;
-        }
         body {
-          background-color: white !important;
           margin: 0 !important;
           padding: 0 !important;
+          background-color: white !important;
         }
+
         #root {
           margin: 0 !important;
           padding: 0 !important;
+        }
+
+        .no-print, .no-print-container {
+          display: none !important;
+        }
+
+        #printArea {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 210mm;
+          min-height: 297mm;
+          margin: 0 !important;
+          padding: 10mm; /* User suggested padding for content safety */
+          background: white !important;
+          border: none !important;
+          box-shadow: none !important;
         }
       }
     </style>

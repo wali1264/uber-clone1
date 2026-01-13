@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, 
@@ -652,11 +651,11 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
     window.print();
   };
 
-  const commonSizes = [
+  const PRESET_SIZES = [
     { name: 'A6', w: 105, h: 148 },
     { name: 'B5', w: 176, h: 250 },
-    { name: 'S-Note', w: 100, h: 150 },
-    { name: 'M-Note', w: 148, h: 210 },
+    { name: 'Note S', w: 100, h: 150 },
+    { name: 'Note M', w: 148, h: 210 },
   ];
 
   return (
@@ -691,33 +690,33 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
         {paperSize === 'Custom' && (
           <div className="space-y-3 animate-in slide-in-from-top-1 px-1 border-t pt-2">
              <div className="flex flex-col gap-1">
-               <span className="text-[9px] font-bold text-slate-400">انتخاب سریع اندازه (کلیک کنید):</span>
-               <div className="flex gap-1.5 overflow-x-auto pb-1">
-                 {commonSizes.map(size => (
+               <span className="text-[9px] font-bold text-slate-400">اندازه‌های پیشنهادی (کلیک کنید):</span>
+               <div className="flex gap-2 overflow-x-auto pb-1">
+                 {PRESET_SIZES.map(sz => (
                    <button 
-                     key={size.name}
-                     onClick={() => { setCustomWidth(size.w); setCustomHeight(size.h); }}
-                     className={`flex-shrink-0 px-2 py-1.5 rounded-md border text-[9px] font-bold transition-all ${customWidth === size.w && customHeight === size.h ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-100 hover:border-indigo-300'}`}
+                     key={sz.name} 
+                     onClick={() => { setCustomWidth(sz.w); setCustomHeight(sz.h); }}
+                     className={`px-2 py-1.5 rounded-md text-[9px] font-bold whitespace-nowrap border transition-all ${customWidth === sz.w && customHeight === sz.h ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-indigo-400'}`}
                    >
-                     {size.name} ({size.w}x{size.h})
+                     {sz.name} ({sz.w}x{sz.h})
                    </button>
                  ))}
                </div>
              </div>
              <div className="flex justify-between items-center gap-2">
                <div className="flex flex-col items-center gap-1">
-                 <span className="text-[9px] text-slate-400">H(mm):</span>
+                 <span className="text-[9px] text-slate-400">ارتفاع (mm):</span>
                  <div className="flex items-center gap-1">
                    <button onClick={() => setCustomHeight(prev => Math.max(0, prev - 1))} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
-                   <input type="number" value={customHeight} onChange={e => setCustomHeight(parseInt(e.target.value) || 0)} className="w-14 p-1 bg-slate-50 border rounded text-center text-[10px] font-bold outline-none focus:border-indigo-500" />
+                   <input type="number" value={customHeight} onChange={e => setCustomHeight(parseInt(e.target.value) || 0)} className="w-16 p-1 bg-slate-50 border rounded text-center text-[10px] font-bold outline-none" />
                    <button onClick={() => setCustomHeight(prev => prev + 1)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronUp className="w-3.5 h-3.5" /></button>
                  </div>
                </div>
                <div className="flex flex-col items-center gap-1">
-                 <span className="text-[9px] text-slate-400">W(mm):</span>
+                 <span className="text-[9px] text-slate-400">عرض (mm):</span>
                  <div className="flex items-center gap-1">
                    <button onClick={() => setCustomWidth(prev => Math.max(0, prev - 1))} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
-                   <input type="number" value={customWidth} onChange={e => setCustomWidth(parseInt(e.target.value) || 0)} className="w-14 p-1 bg-slate-50 border rounded text-center text-[10px] font-bold outline-none focus:border-indigo-500" />
+                   <input type="number" value={customWidth} onChange={e => setCustomWidth(parseInt(e.target.value) || 0)} className="w-16 p-1 bg-slate-50 border rounded text-center text-[10px] font-bold outline-none" />
                    <button onClick={() => setCustomWidth(prev => prev + 1)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronUp className="w-3.5 h-3.5" /></button>
                  </div>
                </div>
@@ -730,7 +729,7 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
             onClick={handlePrint} 
             className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
           >
-            <Printer className="w-4 h-4" /> چاپ مستقیم
+            <Printer className="w-4 h-4" /> چاپ A4
           </button>
           <button 
             onClick={onEdit} 
@@ -742,17 +741,15 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
         </div>
       </div>
 
+      {/* The guaranteed printArea container */}
       <div 
-        id="prescription-content"
+        id="printArea"
         dir="ltr"
         style={{ 
           fontSize: `${fontSize}px`,
-          width: paperSize === 'A4' ? '210mm' : paperSize === 'A5' ? '148mm' : `${customWidth}mm`,
-          minHeight: paperSize === 'A4' ? '297mm' : paperSize === 'A5' ? '210mm' : `${customHeight}mm`,
-          margin: '0 auto',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
         }}
-        className="bg-white border border-slate-200 shadow-xl flex flex-col p-8 text-left print:p-2 print:shadow-none print:border-none"
+        className="bg-white border border-slate-200 shadow-xl flex flex-col p-8 text-left print:shadow-none print:border-none"
       >
         <div className={`border-b-2 border-slate-800 pb-2 mb-4 flex justify-between items-end flex-row-reverse`}>
           <div className="text-right">
