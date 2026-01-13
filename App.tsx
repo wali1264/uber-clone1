@@ -37,12 +37,14 @@ import {
   FileBox,
   Maximize2,
   Key,
-  Star
+  Star,
+  FileDown,
+  Edit
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings, DiagnosisTemplate } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS, ICD_DIAGNOSES } from './constants';
 
-// --- IndexedDB Helper for Unlimited Storage ---
+// --- IndexedDB Helper ---
 const DB_NAME = 'AsanNoskhaDB';
 const DB_VERSION = 2; 
 const DRUG_STORE = 'drugs';
@@ -57,9 +59,6 @@ const initDB = (): Promise<IDBDatabase> => {
       }
       const store = db.createObjectStore(DRUG_STORE, { keyPath: 'id' });
       store.createIndex('name', 'name', { unique: false });
-      store.createIndex('brandNames', 'brandNames', { unique: false });
-      store.createIndex('category', 'category', { unique: false });
-      store.createIndex('barcode', 'barcode', { unique: false });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -88,6 +87,7 @@ const App: React.FC = () => {
   const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(DEFAULT_CLINIC_SETTINGS);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+  const [prescriptionToEdit, setPrescriptionToEdit] = useState<Prescription | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [db, setDb] = useState<IDBDatabase | null>(null);
 
@@ -172,13 +172,23 @@ const App: React.FC = () => {
     const newPatient: Patient = { ...p, id: newId, code: `P-${maxCode + 1}`, createdAt: Date.now() };
     setPatients(prev => [newPatient, ...prev]);
     setSelectedPatientId(newId);
+    setPrescriptionToEdit(null);
     setView('NEW_PRESCRIPTION');
   };
 
-  const handleAddPrescription = (pr: Omit<Prescription, 'id' | 'date'>) => {
-    const newPr: Prescription = { ...pr, id: Math.random().toString(36).substr(2, 9), date: Date.now() };
-    setPrescriptions(prev => [newPr, ...prev]);
-    setSelectedPrescription(newPr);
+  const handleSavePrescription = (pr: Omit<Prescription, 'id' | 'date'> & { id?: string }) => {
+    if (pr.id) {
+      // Update existing
+      const updatedPr: Prescription = { ...pr, id: pr.id, date: Date.now() } as Prescription;
+      setPrescriptions(prev => prev.map(p => p.id === pr.id ? updatedPr : p));
+      setSelectedPrescription(updatedPr);
+    } else {
+      // Add new
+      const newPr: Prescription = { ...pr, id: Math.random().toString(36).substr(2, 9), date: Date.now() } as Prescription;
+      setPrescriptions(prev => [newPr, ...prev]);
+      setSelectedPrescription(newPr);
+    }
+    setPrescriptionToEdit(null);
     setView('VIEW_PDF');
   };
 
@@ -186,6 +196,7 @@ const App: React.FC = () => {
     const newPr: Prescription = { ...old, id: Math.random().toString(36).substr(2, 9), patientId: newPatientId, date: Date.now() };
     setPrescriptions(prev => [newPr, ...prev]);
     setSelectedPrescription(newPr);
+    setPrescriptionToEdit(null);
     setView('VIEW_PDF');
   };
 
@@ -274,7 +285,7 @@ const App: React.FC = () => {
             </div>
             <div className="space-y-2">
               {filteredPatients.map(p => (
-                <div key={p.id} className="bg-white border border-slate-100 rounded-lg p-3 flex justify-between items-center shadow-sm hover:border-indigo-200 cursor-pointer active:scale-[0.99] transition-all" onClick={() => { setSelectedPatientId(p.id); setView('NEW_PRESCRIPTION'); }}>
+                <div key={p.id} className="bg-white border border-slate-100 rounded-lg p-3 flex justify-between items-center shadow-sm hover:border-indigo-200 cursor-pointer active:scale-[0.99] transition-all" onClick={() => { setSelectedPatientId(p.id); setPrescriptionToEdit(null); setView('NEW_PRESCRIPTION'); }}>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-700 text-sm">{p.name}</span>
@@ -296,7 +307,8 @@ const App: React.FC = () => {
             db={db}
             patient={currentSelectedPatient || patients.find(p => p.id === selectedPatientId) || patients[0]}
             previousPrescriptions={prescriptions.filter(pr => pr.patientId === selectedPatientId)}
-            onSubmit={handleAddPrescription}
+            initialData={prescriptionToEdit}
+            onSubmit={handleSavePrescription}
             onCancel={() => setView('PATIENTS')}
             onCopy={handleCopyPrescription}
           />
@@ -334,6 +346,11 @@ const App: React.FC = () => {
             settings={clinicSettings}
             prescription={selectedPrescription} 
             patient={patients.find(p => p.id === selectedPrescription.patientId)!}
+            onEdit={() => {
+              setPrescriptionToEdit(selectedPrescription);
+              setSelectedPatientId(selectedPrescription.patientId);
+              setView('NEW_PRESCRIPTION');
+            }}
             onBack={() => setView('HOME')}
           />
         )}
@@ -351,7 +368,6 @@ const App: React.FC = () => {
 
 const QuickAction: React.FC<{ icon: React.ReactNode, bg: string, title: string, onClick: () => void }> = ({ icon, bg, title, onClick }) => (
   <button onClick={onClick} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-100 shadow-sm hover:bg-slate-50 transition-all text-right w-full">
-    {/* Fix for React.cloneElement error: Cast React.ReactElement to generic any to allow className */}
     <div className={`${bg} p-2 rounded-md`}>{React.cloneElement(icon as React.ReactElement<any>, { className: 'w-5 h-5' })}</div>
     <div className="font-bold text-slate-700 text-sm">{title}</div>
   </button>
@@ -359,7 +375,6 @@ const QuickAction: React.FC<{ icon: React.ReactNode, bg: string, title: string, 
 
 const NavBtn: React.FC<{ active: boolean, icon: React.ReactNode, label: string, onClick: () => void }> = ({ active, icon, label, onClick }) => (
   <button onClick={onClick} className={`flex flex-col items-center gap-1 transition-all flex-1 py-1 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>
-    {/* Fix for React.cloneElement error: Cast React.ReactElement to generic any to allow className */}
     {React.cloneElement(icon as React.ReactElement<any>, { className: 'w-5 h-5' })}
     <span className="text-[9px] font-bold">{label}</span>
   </button>
@@ -406,15 +421,15 @@ const FormInput: React.FC<{ label: string, value: string, placeholder?: string, 
 
 const PrescriptionForm: React.FC<{
   db: IDBDatabase, patient: Patient, previousPrescriptions: Prescription[],
+  initialData?: Prescription | null,
   onSubmit: (p: any) => void, onCancel: () => void, onCopy: (old: Prescription, newId: string) => void
-}> = ({ db, patient, previousPrescriptions, onSubmit, onCancel, onCopy }) => {
-  const [cc, setCc] = useState('');
-  const [diagnosis, setDiagnosis] = useState('');
-  const [diagSearch, setDiagSearch] = useState('');
+}> = ({ db, patient, previousPrescriptions, initialData, onSubmit, onCancel, onCopy }) => {
+  const [cc, setCc] = useState(initialData?.cc || '');
+  const [diagnosis, setDiagnosis] = useState(initialData?.diagnosis || '');
+  const [diagSearch, setDiagSearch] = useState(initialData?.diagnosis || '');
   const [showDiagList, setShowDiagList] = useState(false);
-  /* Fix for type error: Prescription requires Medication[] with IDs. Changed meds state type from Omit<Medication, 'id'>[] to Medication[] */
-  const [meds, setMeds] = useState<Medication[]>([]);
-  const [records, setRecords] = useState<ClinicalRecords>({ bp: '', hr: '', pr: '', spo2: '', temp: '' });
+  const [meds, setMeds] = useState<Medication[]>(initialData?.medications || []);
+  const [records, setRecords] = useState<ClinicalRecords>(initialData?.clinicalRecords || { bp: '', hr: '', pr: '', spo2: '', temp: '' });
   const [showDrugList, setShowDrugList] = useState(false);
   const [showCcModal, setShowCcModal] = useState(false);
 
@@ -440,8 +455,11 @@ const PrescriptionForm: React.FC<{
           <div className="font-bold text-sm">{patient.name}</div>
           <div className="text-[10px] text-slate-400">{patient.age} ساله | {patient.code}</div>
         </div>
-        {previousPrescriptions.length > 0 && (
+        {!initialData && previousPrescriptions.length > 0 && (
           <button onClick={() => onCopy(previousPrescriptions[0], patient.id)} className="bg-white/10 hover:bg-white/20 px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"><Copy className="w-3 h-3" /> کاپی نسخه قبلی</button>
+        )}
+        {initialData && (
+          <span className="bg-amber-500/20 text-amber-200 px-2.5 py-1 rounded-lg text-[10px] font-bold">در حال ویرایش</span>
         )}
       </div>
 
@@ -541,7 +559,7 @@ const PrescriptionForm: React.FC<{
         </div>
       </div>
 
-      <button onClick={() => onSubmit({ patientId: patient.id, cc, diagnosis, clinicalRecords: records, medications: meds })} disabled={!diagnosis || meds.length === 0} className="w-full bg-indigo-600 text-white p-3.5 rounded-lg font-bold shadow-lg disabled:opacity-50 transition-all hover:bg-indigo-700">تکمیل و مشاهده نسخه</button>
+      <button onClick={() => onSubmit({ id: initialData?.id, patientId: patient.id, cc, diagnosis, clinicalRecords: records, medications: meds })} disabled={!diagnosis || meds.length === 0} className="w-full bg-indigo-600 text-white p-3.5 rounded-lg font-bold shadow-lg disabled:opacity-50 transition-all hover:bg-indigo-700">{initialData ? 'ذخیره تغییرات' : 'تکمیل و مشاهده نسخه'}</button>
 
       {showDrugList && (
         <DrugModal db={db} onAdd={(t) => {
@@ -619,13 +637,17 @@ const TRANSLATIONS: Record<Language, any> = {
   ps: { dir: 'rtl', header: 'نسخه', date: 'نیټه', code: 'کوډ', name: 'د ناروغ نوم', age: 'عمر', gender: 'جنسیت', phone: 'تلیفون', cc: 'شکایت', diagnosis: 'تشخیص', qty: 'شمیر', address: 'پته', signature: 'لاسلیک', male: 'نارینه', female: 'ښځینه' }
 };
 
-const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: Prescription, patient: Patient, onBack: () => void }> = ({ settings, prescription, patient, onBack }) => {
+const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: Prescription, patient: Patient, onEdit: () => void, onBack: () => void }> = ({ settings, prescription, patient, onEdit, onBack }) => {
   const [fontSize, setFontSize] = useState(14);
   const [lang, setLang] = useState<Language>('dr');
   const [paperSize, setPaperSize] = useState<PaperSize>('A4');
   const [customWidth, setCustomWidth] = useState(210);
   const [customHeight, setCustomHeight] = useState(297);
   const t = TRANSLATIONS[lang];
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <div className="space-y-4 pb-20 no-print-container animate-in fade-in">
@@ -656,62 +678,62 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
            </div>
         </div>
 
-        {paperSize === 'Custom' && (
-          <div className="flex justify-between items-center gap-2 animate-in slide-in-from-top-1">
-             <div className="flex items-center gap-1">
-               <span className="text-[9px] text-slate-400">H:</span>
-               <input type="number" value={customHeight} onChange={e => setCustomHeight(parseInt(e.target.value) || 0)} className="w-12 p-1 border rounded text-center" />
-             </div>
-             <div className="flex items-center gap-1">
-               <span className="text-[9px] text-slate-400">W:</span>
-               <input type="number" value={customWidth} onChange={e => setCustomWidth(parseInt(e.target.value) || 0)} className="w-12 p-1 border rounded text-center" />
-             </div>
-          </div>
-        )}
-
         <div className="flex gap-2">
-          <button onClick={() => window.print()} className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-bold flex items-center justify-center gap-1.5"><Printer className="w-4 h-4" /> چاپ</button>
+          <button 
+            onClick={handlePrint} 
+            className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+          >
+            <Printer className="w-4 h-4" /> چاپ مستقیم
+          </button>
+          <button 
+            onClick={onEdit} 
+            className="flex-1 bg-amber-500 text-white py-2.5 rounded-lg font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+          >
+            <Edit className="w-4 h-4" /> ویرایش نسخه
+          </button>
           <button onClick={onBack} className="bg-slate-100 text-slate-500 px-4 rounded-lg"><ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
 
       <div 
-        dir={t.dir}
+        id="prescription-content"
+        dir="ltr"
         style={{ 
           fontSize: `${fontSize}px`,
           width: paperSize === 'A4' ? '210mm' : paperSize === 'A5' ? '148mm' : `${customWidth}mm`,
           minHeight: paperSize === 'A4' ? '297mm' : paperSize === 'A5' ? '210mm' : `${customHeight}mm`,
-          margin: '0 auto'
+          margin: '0 auto',
+          boxSizing: 'border-box'
         }}
-        className="bg-white border border-slate-200 shadow-xl flex flex-col p-8 print:p-2 print:shadow-none print:border-none"
+        className="bg-white border border-slate-200 shadow-xl flex flex-col p-8 text-left print:p-2 print:shadow-none print:border-none"
       >
-        <div className={`border-b-2 border-slate-800 pb-2 mb-4 flex justify-between items-end ${t.dir === 'rtl' ? 'flex-row' : 'flex-row-reverse'}`}>
-          <div className={t.dir === 'rtl' ? 'text-right' : 'text-left'}>
+        <div className={`border-b-2 border-slate-800 pb-2 mb-4 flex justify-between items-end flex-row-reverse`}>
+          <div className="text-right">
             <h1 className="text-lg font-black text-slate-900">{settings.name}</h1>
             <p className="text-xs font-bold text-indigo-700">{settings.doctor} | {settings.specialty}</p>
           </div>
-          <div className={t.dir === 'rtl' ? 'text-left' : 'text-right'}>
+          <div className="text-left">
             <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase">{t.header}</span>
             <p className="text-[9px] text-slate-400 mt-1">{t.date}: {new Date(prescription.date).toLocaleDateString(lang === 'en' ? 'en-US' : 'fa-AF')}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-2 bg-slate-50 p-3 rounded-lg mb-6 text-[10px]">
+        <div className="grid grid-cols-4 gap-2 bg-slate-50 p-3 rounded-lg mb-6 text-[10px] text-left">
            <InfoItem label={t.name} value={patient.name} />
            <InfoItem label={t.age} value={patient.age} />
            <InfoItem label={t.gender} value={patient.gender === 'male' ? t.male : t.female} />
            <InfoItem label={t.phone} value={patient.phone} />
         </div>
 
-        <div className={`flex gap-4 flex-1 ${t.dir === 'ltr' ? 'flex-row-reverse' : 'flex-row'}`}>
-          <div className={`w-16 border-dashed border-slate-100 space-y-4 pt-2 ${t.dir === 'rtl' ? 'border-l' : 'border-r'}`}>
+        <div className={`flex gap-4 flex-1 flex-row`}>
+          <div className={`w-16 border-dashed border-slate-100 space-y-4 pt-2 border-r`}>
              <SidebarRecord label="BP" value={prescription.clinicalRecords.bp} />
              <SidebarRecord label="HR" value={prescription.clinicalRecords.hr} />
              <SidebarRecord label="PR" value={prescription.clinicalRecords.pr} />
              <SidebarRecord label="SpO2" value={prescription.clinicalRecords.spo2} />
              <SidebarRecord label="Temp" value={prescription.clinicalRecords.temp} />
           </div>
-          <div className={`flex-1 pt-2 ${t.dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+          <div className={`flex-1 pt-2 text-left`}>
             {prescription.cc && (
               <div className="mb-4">
                 <span className="text-[9px] font-bold text-slate-300 uppercase">{t.cc}:</span>
@@ -733,11 +755,11 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
             <div className="space-y-4">
               {prescription.medications.map((m, idx) => (
                 <div key={idx} className="border-b border-slate-50 pb-2">
-                   <div className={`flex justify-between items-center ${t.dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
+                   <div className={`flex justify-between items-center flex-row`}>
                       <span className="text-sm font-black text-slate-800">{idx + 1}. {m.name}</span>
                       <span className="text-[10px] font-bold text-indigo-600">{m.strength}</span>
                    </div>
-                   <div className={`flex justify-between mt-1 ${t.dir === 'rtl' ? 'flex-row-reverse' : 'flex-row'}`}>
+                   <div className={`flex justify-between mt-1 flex-row`}>
                       <p className="text-[10px] text-slate-500">{m.instructions}</p>
                       <span className="text-[9px] text-slate-400">{t.qty}: {m.quantity}</span>
                    </div>
@@ -748,7 +770,7 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
         </div>
 
         <div className="mt-auto pt-4 border-t border-slate-100 flex justify-between items-end text-[9px] text-slate-400">
-          <div className={t.dir === 'rtl' ? 'text-right' : 'text-left'}>
+          <div className="text-left">
              <p className="font-bold text-slate-600">{t.address}</p>
              <p>{settings.address} | {settings.phone}</p>
           </div>
@@ -760,14 +782,14 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
 };
 
 const InfoItem: React.FC<{ label: string, value: string }> = ({ label, value }) => (
-  <div>
+  <div className="text-left">
     <span className="text-[8px] text-slate-300 font-bold block">{label}</span>
     <span className="font-bold text-slate-700 block">{value || '-'}</span>
   </div>
 );
 
 const SidebarRecord: React.FC<{ label: string, value: string }> = ({ label, value }) => (
-  <div className="flex flex-col items-center">
+  <div className="flex flex-col items-start">
     <span className="text-[8px] font-bold text-slate-300">{label}</span>
     <span className="text-[10px] font-black text-slate-800">{value || '--'}</span>
   </div>
