@@ -30,6 +30,7 @@ import {
   Calendar,
   Check,
   ChevronDown,
+  ChevronUp,
   Pill,
   Bookmark,
   BriefcaseMedical,
@@ -39,7 +40,9 @@ import {
   Key,
   Star,
   FileDown,
-  Edit
+  Edit,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings, DiagnosisTemplate } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS, ICD_DIAGNOSES } from './constants';
@@ -649,6 +652,13 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
     window.print();
   };
 
+  const commonSizes = [
+    { name: 'A6', w: 105, h: 148 },
+    { name: 'B5', w: 176, h: 250 },
+    { name: 'S-Note', w: 100, h: 150 },
+    { name: 'M-Note', w: 148, h: 210 },
+  ];
+
   return (
     <div className="space-y-4 pb-20 no-print-container animate-in fade-in">
       <div className="flex flex-col gap-3 no-print bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-[11px]">
@@ -677,6 +687,43 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
              ))}
            </div>
         </div>
+
+        {paperSize === 'Custom' && (
+          <div className="space-y-3 animate-in slide-in-from-top-1 px-1 border-t pt-2">
+             <div className="flex flex-col gap-1">
+               <span className="text-[9px] font-bold text-slate-400">انتخاب سریع اندازه (کلیک کنید):</span>
+               <div className="flex gap-1.5 overflow-x-auto pb-1">
+                 {commonSizes.map(size => (
+                   <button 
+                     key={size.name}
+                     onClick={() => { setCustomWidth(size.w); setCustomHeight(size.h); }}
+                     className={`flex-shrink-0 px-2 py-1.5 rounded-md border text-[9px] font-bold transition-all ${customWidth === size.w && customHeight === size.h ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-100 hover:border-indigo-300'}`}
+                   >
+                     {size.name} ({size.w}x{size.h})
+                   </button>
+                 ))}
+               </div>
+             </div>
+             <div className="flex justify-between items-center gap-2">
+               <div className="flex flex-col items-center gap-1">
+                 <span className="text-[9px] text-slate-400">H(mm):</span>
+                 <div className="flex items-center gap-1">
+                   <button onClick={() => setCustomHeight(prev => Math.max(0, prev - 1))} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
+                   <input type="number" value={customHeight} onChange={e => setCustomHeight(parseInt(e.target.value) || 0)} className="w-14 p-1 bg-slate-50 border rounded text-center text-[10px] font-bold outline-none focus:border-indigo-500" />
+                   <button onClick={() => setCustomHeight(prev => prev + 1)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronUp className="w-3.5 h-3.5" /></button>
+                 </div>
+               </div>
+               <div className="flex flex-col items-center gap-1">
+                 <span className="text-[9px] text-slate-400">W(mm):</span>
+                 <div className="flex items-center gap-1">
+                   <button onClick={() => setCustomWidth(prev => Math.max(0, prev - 1))} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronDown className="w-3.5 h-3.5" /></button>
+                   <input type="number" value={customWidth} onChange={e => setCustomWidth(parseInt(e.target.value) || 0)} className="w-14 p-1 bg-slate-50 border rounded text-center text-[10px] font-bold outline-none focus:border-indigo-500" />
+                   <button onClick={() => setCustomWidth(prev => prev + 1)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"><ChevronUp className="w-3.5 h-3.5" /></button>
+                 </div>
+               </div>
+             </div>
+          </div>
+        )}
 
         <div className="flex gap-2">
           <button 
