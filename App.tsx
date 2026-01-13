@@ -663,20 +663,40 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
     styleEl.innerHTML = `
       @page { size: ${width}mm ${height}mm; margin: 0; }
       @media print {
-        html, body { margin: 0; padding: 0; width: ${width}mm; height: ${height}mm; }
+        html, body { 
+          margin: 0 !important; 
+          padding: 0 !important; 
+          width: ${width}mm; 
+          height: ${height}mm; 
+        }
+        
+        /* Hide everything by default */
+        body * {
+          visibility: hidden;
+        }
+
+        /* Show only the print container and its children */
+        #print, #print * {
+          visibility: visible;
+        }
+
         #print {
-          width: ${width}mm;
-          min-height: ${height}mm;
           position: absolute;
           top: 0;
           left: 0;
+          width: ${width}mm;
+          min-height: ${height}mm;
           padding: 10mm;
           margin: 0;
           background: white !important;
           box-sizing: border-box;
+          border: none !important;
+          box-shadow: none !important;
         }
+
         .no-print, .no-print-container {
           display: none !important;
+          visibility: hidden !important;
         }
       }
     `;
@@ -752,7 +772,7 @@ const PrescriptionPrintView: React.FC<{ settings: ClinicSettings, prescription: 
         className="bg-white border border-slate-200 shadow-xl flex flex-col p-8 text-left print:p-0 print:shadow-none print:border-none"
       >
         <div className={`border-b-2 border-slate-800 pb-2 mb-4 flex justify-between items-end flex-row`}>
-          {/* Left Side: Metadata and Branding */}
+          {/* Left Side: Metadata */}
           <div className="text-left">
             <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-[9px] font-bold uppercase">{t.header}</span>
             <p className="text-[9px] text-slate-400 mt-1">{t.date}: {new Date(prescription.date).toLocaleDateString(lang === 'en' ? 'en-US' : 'fa-AF')}</p>
