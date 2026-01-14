@@ -1,4 +1,3 @@
-
 export interface Patient {
   id: string;
   code: string;
@@ -39,16 +38,17 @@ export interface Prescription {
 
 export interface DrugTemplate {
   id: string;
-  name: string; // Generic Name
-  brandNames?: string; // e.g., Panadol, Calpol
-  form: string; // e.g., Tablet, Syrup, Injection
+  name: string;
   defaultStrength: string;
   defaultInstructions: string;
+  // Added properties to match INITIAL_DRUGS in constants.ts
+  brandNames?: string;
+  form?: string;
   category?: string;
   company?: string;
-  barcode?: string;
 }
 
+// Added DiagnosisTemplate as it was missing and used in constants.ts
 export interface DiagnosisTemplate {
   code: string;
   title: string;
