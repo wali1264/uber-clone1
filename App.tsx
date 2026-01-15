@@ -65,14 +65,14 @@ const MEDICAL_CC_CATEGORIES = [
 ];
 
 const MEDICAL_DIAGNOSES = [
-  { cat: 'Respiratory', items: ['Acute Bronchitis', 'Pneumonia', 'COPD Exacerbation', 'Bronchial Asthma', 'URTI', 'COVID-19', 'Pharyngitis'] },
-  { cat: 'Gastrointestinal', items: ['Acute Gastritis', 'Peptic Ulcer Disease (PUD)', 'GERD', 'Acute Gastroenteritis', 'IBS', 'H. Pylori Infection', 'Amoebic Dysentery'] },
-  { cat: 'Cardiovascular', items: ['Essential Hypertension', 'Angina Pectoris', 'Heart Failure', 'Atrial Fibrillation', 'Valvular Heart Disease', 'Peripheral Vascular Disease'] },
-  { cat: 'Endocrine', items: ['Diabetes Mellitus Type 2', 'Diabetes Mellitus Type 1', 'Hypothyroidism', 'Hyperthyroidism', 'Dyslipidemia', 'Vitamin D Deficiency'] },
-  { cat: 'Infectious', items: ['Enteric Fever (Typhoid)', 'Malaria (PF)', 'Malaria (PV)', 'Urinary Tract Infection (UTI)', 'Sepsis', 'Viral Fever', 'Tuberculosis'] },
-  { cat: 'Neurological', items: ['Migraine', 'Tension-type Headache', 'Ischemic Stroke', 'Hemorrhagic Stroke', 'Epilepsy', 'Peripheral Neuropathy', 'Vertigo'] },
-  { cat: 'Orthopedic', items: ['Osteoarthritis', 'Rheumatoid Arthritis', 'Low Back Pain', 'Sciatica', 'Cervical Spondylosis', 'Osteoporosis'] },
-  { cat: 'Dermatology', items: ['Contact Dermatitis', 'Eczema', 'Urticaria', 'Fungal Infection', 'Scabies', 'Acne Vulgaris'] }
+  { cat: 'Respiratory', items: ['Acute Bronchitis', 'Community Acquired Pneumonia', 'COPD Exacerbation', 'Bronchial Asthma', 'Viral URTI', 'Pulmonary Tuberculosis', 'Acute Tonsillopharyngitis', 'Sinusitis', 'Bronchiectasis'] },
+  { cat: 'Gastrointestinal', items: ['Acute Gastritis', 'Peptic Ulcer Disease', 'GERD', 'Acute Gastroenteritis', 'Irritable Bowel Syndrome', 'H. Pylori Infection', 'Bacillary Dysentery', 'Amoebic Colitis', 'Acute Cholecystitis', 'Hepatitis'] },
+  { cat: 'Cardiovascular', items: ['Essential Hypertension', 'Ischemic Heart Disease', 'Congestive Heart Failure', 'Atrial Fibrillation', 'Deep Vein Thrombosis', 'Valvular Heart Disease'] },
+  { cat: 'Endocrine', items: ['Diabetes Mellitus Type 2', 'Diabetes Mellitus Type 1', 'Hypothyroidism', 'Hyperthyroidism', 'Dyslipidemia', 'Vitamin D Deficiency', 'Polycystic Ovary Syndrome'] },
+  { cat: 'Infectious', items: ['Enteric Fever (Typhoid)', 'Malaria (Falciparum)', 'Malaria (Vivax)', 'Urinary Tract Infection', 'Acute Pyelonephritis', 'Sepsis', 'Meningitis', 'Brucellosis'] },
+  { cat: 'Neurological', items: ['Migraine', 'Tension Headache', 'Ischemic Stroke', 'Transient Ischemic Attack', 'Epilepsy', 'Peripheral Neuropathy', 'BPPV / Vertigo'] },
+  { cat: 'Orthopedic', items: ['Osteoarthritis', 'Rheumatoid Arthritis', 'Lumbar Radiculopathy', 'Cervical Spondylosis', 'Osteoporosis', 'Fibromyalgia', 'Gouty Arthritis'] },
+  { cat: 'Dermatology', items: ['Eczema / Dermatitis', 'Urticaria', 'Fungal Skin Infection', 'Scabies', 'Acne Vulgaris', 'Psoriasis', 'Herpes Zoster'] }
 ];
 
 const App: React.FC = () => {
@@ -346,7 +346,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const [diagnosis, setDiagnosis] = useState(initialData?.diagnosis || '');
   const [diagSearch, setDiagSearch] = useState('');
   const [meds, setMeds] = useState<any[]>(initialData?.medications || []);
-  const [records, setRecords] = useState<ClinicalRecords>(initialData?.clinicalRecords || { bp: '', hr: '', pr: '', spo2: '', temp: '' });
+  const [records, setRecords] = useState<ClinicalRecords>(initialData?.clinicalRecords || { bp: '', hr: '', pr: '', spo2: '', temp: '', wt: '' });
   const [showDrugList, setShowDrugList] = useState(false);
   const [drugSearchQuery, setDrugSearchQuery] = useState('');
   const [drugResults, setDrugResults] = useState<DrugTemplate[]>([]);
@@ -402,7 +402,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
 
       <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
         <h3 className="text-[10px] font-bold text-gray-300 uppercase tracking-[2px] mb-2 text-right">Vital Signs (V.S)</h3>
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-6 gap-2">
           {Object.entries(records).map(([k, v]) => (
             <div key={k} className="flex flex-col gap-1.5">
               <label className="text-[8px] font-black text-gray-300 uppercase text-center">{k}</label>
@@ -629,15 +629,12 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack, onEd
 
             <div className="pt-4 border-t border-slate-100 space-y-2">
               <button onClick={handlePrint} className="w-full bg-indigo-700 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-800 transition-all">
-                <Printer className="w-5 h-5" /> چاپ مستقیم
+                <Printer className="w-5 h-5" /> چاپ مستقیم نسخه
               </button>
               <button onClick={onEdit} className="w-full bg-orange-600 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-orange-700 transition-all">
-                <Edit3 className="w-5 h-5" /> تغییر و ویرایش نسخه
+                <Edit3 className="w-5 h-5" /> ویرایش مجدد نسخه
               </button>
-              <button onClick={handlePrint} className="w-full bg-white text-slate-700 border border-slate-200 p-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all text-xs">
-                <FileDown className="w-4 h-4" /> ذخیره PDF
-              </button>
-              <button onClick={onBack} className="w-full text-slate-400 p-2 text-xs hover:text-red-500 transition-colors">لغو و بازگشت</button>
+              <button onClick={onBack} className="w-full text-slate-400 p-2 text-xs hover:text-red-500 transition-colors">بازگشت به خانه</button>
             </div>
           </div>
         )}
@@ -645,144 +642,221 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack, onEd
 
       {/* Real Paper Preview Area */}
       <div className="flex-1 flex flex-col items-center overflow-auto p-4 md:p-12 pb-32 bg-slate-300 relative">
-        <div className="no-print absolute top-4 left-1/2 -translate-x-1/2 bg-indigo-900 text-white px-6 py-2 rounded-full text-[10px] font-black tracking-widest uppercase opacity-50 z-10 shadow-lg pointer-events-none">
-          Visual Alignment Guide (WYSIWYG)
-        </div>
-
-        {/* The Paper Simulation Container (Shows bounds) */}
         <div 
           className="relative transition-all duration-500 flex items-center justify-center"
-          style={{
-             padding: '40px', // Extra space around for "alignment" feel
-          }}
+          style={{ padding: '20px' }}
         >
-          {/* Subtle Guidelines for Alignment */}
-          <div className="no-print absolute top-0 left-0 w-full h-full border border-dashed border-indigo-200/40 pointer-events-none rounded-sm"></div>
-
-          {/* Actual Printable Document */}
+          {/* Main Print Container Wrapper */}
           <div 
-            id="printable-document"
-            style={{ 
-              fontSize: `${fontSize}px`,
-              fontFamily: fontFamily,
-              padding: `${margin}mm`,
-              lineHeight: lineHeight,
-              width: orientation === 'portrait' ? (pageSize === 'A4' ? '210mm' : pageSize === 'A5' ? '148mm' : '216mm') : (pageSize === 'A4' ? '297mm' : pageSize === 'A5' ? '210mm' : '279mm'),
-              minHeight: orientation === 'portrait' ? (pageSize === 'A4' ? '297mm' : pageSize === 'A5' ? '210mm' : '279mm') : (pageSize === 'A4' ? '210mm' : pageSize === 'A5' ? '148mm' : '216mm'),
-            }}
-            className="bg-white shadow-[0_30px_100px_rgba(0,0,0,0.3)] flex flex-col relative print:shadow-none print:m-0 overflow-hidden text-left prescription-print-area"
-            dir="ltr"
+            id="print-area"
           >
-            {/* Direct Print CSS */}
             <style>{`
+              /* ظاهر عادی اپ - هماهنگ با درخواست کاربر */
+              .rx-page {
+                width: 210mm;
+                min-height: 297mm;
+                background: white;
+                padding: ${margin}mm;
+                box-sizing: border-box;
+                font-family: ${fontFamily}, "Segoe UI", Tahoma, sans-serif;
+                color: #000;
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                text-align: right;
+                direction: rtl;
+                box-shadow: 0 30px 100px rgba(0,0,0,0.3);
+              }
+
+              .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                border-bottom: 2px solid #000;
+                padding-bottom: 5mm;
+              }
+
+              .doctor-info h3 {
+                font-size: 1.5rem;
+                font-weight: bold;
+                margin: 0;
+                color: #000;
+              }
+
+              .doctor-info p {
+                font-size: 1rem;
+                margin: 2px 0;
+                color: #000;
+              }
+
+              .rx {
+                font-size: 32px;
+                font-weight: bold;
+                direction: ltr;
+                font-family: serif;
+              }
+
+              .patient-info {
+                margin-top: 10mm;
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 5mm;
+                border-bottom: 1px solid #eee;
+                padding-bottom: 5mm;
+                font-size: 1rem;
+              }
+
+              .diagnosis {
+                margin-top: 10mm;
+              }
+
+              .diagnosis strong {
+                font-weight: bold;
+                font-size: 1.1rem;
+              }
+
+              .diagnosis p {
+                margin-top: 2mm;
+                font-size: 1.2rem;
+                font-weight: bold;
+              }
+
+              .medicines {
+                margin-top: 8mm;
+                min-height: 120mm;
+                direction: ltr;
+                text-align: left;
+                flex: 1;
+              }
+
+              .medicines ol {
+                list-style: decimal inside;
+                padding: 0;
+              }
+
+              .medicines li {
+                font-size: ${fontSize}px;
+                line-height: ${lineHeight};
+                margin-bottom: 5mm;
+                border-bottom: 1px solid #f9f9f9;
+                padding-bottom: 3mm;
+              }
+
+              .footer {
+                position: absolute;
+                bottom: 20mm;
+                left: ${margin}mm;
+                right: ${margin}mm;
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-end;
+                border-top: 1px solid #eee;
+                padding-top: 5mm;
+              }
+
+              .doctor-signature {
+                text-align: center;
+                border-top: 1px solid #000;
+                padding-top: 2mm;
+                min-width: 50mm;
+                font-size: 0.9rem;
+              }
+
+              .clinic-footer-info {
+                text-align: right;
+                direction: rtl;
+              }
+
+              .clinic-footer-info p {
+                margin: 1px 0;
+                font-size: 0.85rem;
+              }
+
+              /* 🔴🔴 مخصوص چاپ 🔴🔴 */
               @media print {
+                body {
+                  margin: 0 !important;
+                  background: white !important;
+                  -webkit-print-color-adjust: exact;
+                }
+
+                /* مخفی کردن تمام اجزا بجای منطقه چاپ */
+                body * {
+                  visibility: hidden;
+                }
+
+                #print-area,
+                #print-area * {
+                  visibility: visible;
+                }
+
+                #print-area {
+                  position: absolute;
+                  left: 0;
+                  top: 0;
+                  width: 210mm !important;
+                  height: 297mm !important;
+                  box-shadow: none !important;
+                  transform: none !important;
+                }
+
+                .rx-page {
+                  box-shadow: none !important;
+                  width: 210mm !important;
+                  height: 297mm !important;
+                  margin: 0 !important;
+                  padding: ${margin}mm !important;
+                }
+
                 @page {
-                  size: ${pageSize} ${orientation};
+                  size: A4;
                   margin: 0;
                 }
-                body { background: white !important; visibility: hidden !important; }
-                .prescription-print-area {
-                  visibility: visible !important;
-                  position: absolute !important;
-                  left: 0 !important;
-                  top: 0 !important;
-                  width: 100% !important;
-                  height: 100% !important;
-                  margin: 0 !important;
-                  box-shadow: none !important;
-                }
-                .no-print { display: none !important; }
               }
             `}</style>
 
-            {/* Header */}
-            <div className="border-b-[4px] border-indigo-900 pb-6 mb-8 flex justify-between items-end">
-              <div className="text-left flex flex-col items-start gap-1">
-                <div className="bg-indigo-900 text-white px-4 py-1.5 rounded-lg font-black text-[10px] tracking-widest">PRESCRIPTION</div>
-                <p className="text-[10px] text-slate-400 font-mono font-bold">DATE: {new Date(prescription.date).toLocaleDateString('fa-AF')}</p>
-                <p className="text-[10px] text-slate-400 font-mono font-bold">ID: {patient.code}</p>
-              </div>
-              <div className="text-right">
-                <h1 className="text-2xl font-black text-indigo-900 tracking-tighter mb-1">{settings.name}</h1>
-                <h2 className="text-lg font-bold text-slate-800">{settings.doctor}</h2>
-                <p className="text-[11px] text-indigo-600 font-black uppercase tracking-widest">{settings.specialty}</p>
-              </div>
-            </div>
-
-            {/* Patient Info */}
-            <div className="grid grid-cols-4 gap-4 bg-slate-50 p-6 rounded-3xl mb-8 text-[13px] border border-slate-100">
-               <div><span className="text-[8px] text-slate-300 block uppercase font-black mb-1">Name</span><span className="font-black text-slate-900 text-sm">{patient.name}</span></div>
-               <div><span className="text-[8px] text-slate-300 block uppercase font-black mb-1">Age</span><span className="font-black text-slate-900 text-sm">{patient.age}</span></div>
-               <div><span className="text-[8px] text-slate-300 block uppercase font-black mb-1">Gender</span><span className="font-black text-slate-900 text-sm capitalize">{patient.gender}</span></div>
-               <div><span className="text-[8px] text-slate-300 block uppercase font-black mb-1">Phone</span><span className="font-black text-slate-900 text-sm font-mono">{patient.phone || 'N/A'}</span></div>
-            </div>
-
-            <div className="flex gap-10 flex-1 relative">
-              {showWatermark && (
-                <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
-                   <Stethoscope className="w-1/2 h-1/2" />
+            <div className="rx-page">
+              <div className="header">
+                <div className="doctor-info">
+                  <h3>{settings.doctor}</h3>
+                  <p>{settings.specialty}</p>
+                  <p>شماره نظام پزشکی: {settings.tagline}</p>
                 </div>
-              )}
-
-              {/* Vitals Sidebar */}
-              <div className="w-16 space-y-10 pt-4 border-r-2 border-dashed border-slate-100 flex flex-col items-center">
-                 {Object.entries(prescription.clinicalRecords).map(([k, v]) => (
-                   <div key={k} className="text-center">
-                     <span className="text-[8px] font-black text-slate-300 uppercase block mb-1 tracking-wider">{k.toUpperCase()}</span>
-                     <p className="text-[10px] font-black text-slate-900">{(v as string) || '--'}</p>
-                   </div>
-                 ))}
+                <div className="rx">Rx</div>
               </div>
 
-              {/* Medical Rx Details */}
-              <div className="flex-1 pt-4 relative z-10">
-                <div className="mb-6">
-                  <span className="text-[9px] text-indigo-300 font-black uppercase block mb-1 tracking-widest">Chief Complaint</span>
-                  <p className="font-bold text-slate-700 border-l-[3px] border-indigo-200 pl-4 py-0.5">{prescription.cc || 'N/A'}</p>
-                </div>
-                
-                <div className="mb-8">
-                  <span className="text-[9px] text-indigo-300 font-black uppercase block mb-1 tracking-widest">Diagnosis</span>
-                  <p className="text-xl font-black text-slate-900 border-l-[4px] border-indigo-600 pl-4 py-0.5">{prescription.diagnosis}</p>
-                </div>
-                
-                <div className="text-[60px] font-serif text-indigo-900 italic opacity-5 mb-4 select-none leading-none">Rx</div>
-                
-                <div className="space-y-6">
+              <div className="patient-info">
+                <div><strong>نام بیمار:</strong> {patient.name}</div>
+                <div><strong>سن:</strong> {patient.age}</div>
+                <div><strong>وزن:</strong> {prescription.clinicalRecords.wt || '--'} kg</div>
+                <div><strong>تاریخ:</strong> {new Date(prescription.date).toLocaleDateString('fa-AF')}</div>
+              </div>
+
+              <div className="diagnosis">
+                <strong>تشخیص (Diagnosis):</strong>
+                <p>{prescription.diagnosis}</p>
+              </div>
+
+              <div className="medicines">
+                <ol>
                   {prescription.medications.map((m: Medication, idx: number) => (
-                    <div key={m.id || idx} className="border-b border-slate-50 pb-4 flex gap-4">
-                       <span className="text-indigo-200 font-black text-lg">{idx + 1}.</span>
-                       <div className="flex-1">
-                          <div className="flex justify-between items-baseline mb-1">
-                             <span className="font-black text-slate-900 text-lg">{m.name}</span>
-                             <span className="text-sm font-black text-indigo-700">{m.strength}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-[0.9em]">
-                             <p className="text-slate-500 font-bold leading-relaxed">{m.instructions}</p>
-                             <span className="text-[9px] font-black text-indigo-400 bg-indigo-50 px-2 py-0.5 rounded uppercase">Qty: {m.quantity}</span>
-                          </div>
-                       </div>
-                    </div>
+                    <li key={m.id || idx}>
+                      <strong>{m.name} {m.strength}</strong> — {m.instructions}
+                    </li>
                   ))}
-                </div>
+                </ol>
               </div>
-            </div>
 
-            {/* Footer */}
-            <div className="mt-auto pt-8 flex justify-between items-end border-t border-slate-100">
-              {showSignature && (
-                <div className="text-center pb-2">
-                  <div className="w-32 border-t-2 border-indigo-900 mb-1"></div>
-                  <p className="font-black uppercase tracking-widest text-[9px] text-indigo-900">Dr. Signature</p>
-                </div>
-              )}
-              {showFooter && (
-                <div className="space-y-1 max-w-[300px] text-right">
-                   <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">Address & Contact</p>
-                   <p className="font-bold text-slate-500 text-[10px] leading-tight">{settings.address}</p>
-                   <p className="font-mono font-black text-indigo-400 text-xs">{settings.phone}</p>
-                </div>
-              )}
+              <div className="footer">
+                <div className="doctor-signature">مهر و امضا داکتر</div>
+                {showFooter && (
+                  <div className="clinic-footer-info">
+                    <p style={{ fontWeight: 'bold' }}>{settings.name}</p>
+                    <p>{settings.address}</p>
+                    <p style={{ direction: 'ltr', textAlign: 'right' }}>{settings.phone}</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

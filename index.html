@@ -10,21 +10,18 @@
       body {
         font-family: 'Vazirmatn', sans-serif;
         background-color: #f8fafc;
-      }
-      @media print {
-        @page {
-          size: auto;
-          margin: 10mm;
-        }
-        .no-print {
-          display: none !important;
-        }
-        body {
-          background-color: white !important;
-        }
+        margin: 0;
+        padding: 0;
       }
       .fade-in { animation: fadeIn 0.3s ease-in-out; }
       @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      
+      /* استایل پایه برای مخفی کردن عناصر در هنگام چاپ */
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+      }
     </style>
     <script type="importmap">
     {

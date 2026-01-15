@@ -1,3 +1,4 @@
+
 export interface Patient {
   id: string;
   code: string;
@@ -15,6 +16,7 @@ export interface ClinicalRecords {
   pr: string;
   spo2: string;
   temp: string;
+  wt: string;
 }
 
 export interface Medication {
@@ -41,14 +43,12 @@ export interface DrugTemplate {
   name: string;
   defaultStrength: string;
   defaultInstructions: string;
-  // Added properties to match INITIAL_DRUGS in constants.ts
   brandNames?: string;
   form?: string;
   category?: string;
   company?: string;
 }
 
-// Added DiagnosisTemplate as it was missing and used in constants.ts
 export interface DiagnosisTemplate {
   code: string;
   title: string;
