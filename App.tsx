@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Users, 
   History, 
@@ -18,13 +18,7 @@ import {
   Plus, 
   Database, 
   Key,
-  Layout,
-  Type as TypeIcon,
-  Scaling,
-  Move,
   FileDown,
-  PanelLeftClose,
-  PanelLeftOpen,
   Edit3
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings } from './types';
@@ -508,7 +502,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
               <button onClick={() => { setMeds([...meds, { id: Math.random().toString(), name: '', strength: '', quantity: '', instructions: '' }]); setShowDrugList(false); }} className="w-full p-4.5 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform"><Plus className="w-5 h-5" /> دوای جدید (دستی)</button>
               <div className="pt-2">
                 {drugResults.map(t => (
-                  <div key={t.id} onClick={() => { setMeds([...meds, { id: Math.random().toString(), name: t.name, strength: t.defaultStrength, quantity: '', instructions: t.defaultInstructions }]); setShowDrugList(false); }} className="p-4 border border-gray-50 rounded-2xl hover:bg-indigo-50 cursor-pointer group transition-all active:scale-[0.98] mb-2">
+                  <div key={t.id} onClick={() => { setMeds([...meds, { id: Math.random().toString(), name: t.name, strength: t.defaultStrength, quantity: '', instructions: t.defaultInstructions }]); setShowDrugList(false); }} className="p-4 border border-gray-100 rounded-2xl hover:bg-indigo-50 cursor-pointer group transition-all active:scale-[0.98] mb-2">
                     <div className="font-bold text-gray-800 group-hover:text-indigo-700 transition-colors">{t.name} <span className="text-[9px] opacity-40 font-normal">({t.brandNames?.split(',')[0]})</span></div>
                     <div className="text-[10px] text-gray-400 mt-1 font-medium italic">{t.defaultStrength} — {t.category}</div>
                   </div>
@@ -523,340 +517,143 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
 };
 
 const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack, onEdit }: any) => {
-  const [pageSize, setPageSize] = useState<'A4' | 'A5' | 'Letter'>('A4');
-  const [fontSize, setFontSize] = useState(14);
-  const [margin, setMargin] = useState(15); 
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
-  const [lineHeight, setLineHeight] = useState(1.5);
-  const [showWatermark, setShowWatermark] = useState(true);
-  const [fontFamily, setFontFamily] = useState('Vazirmatn');
-  const [showFooter, setShowFooter] = useState(true);
-  const [showSignature, setShowSignature] = useState(true);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-
-  const handlePrint = () => {
+  const printPrescription = () => {
     window.print();
   };
 
+  const exportWord = () => {
+    const content = document.getElementById("printArea")?.innerHTML;
+    if (!content) return;
+
+    const html = `
+      <html dir="rtl">
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Tahoma', 'Arial', sans-serif; padding: 20mm; direction: rtl; text-align: right; }
+            .sidebar { width: 30%; float: left; background: #f9f9f9; padding: 10mm; }
+            .content { width: 70%; float: right; padding: 10mm; }
+            .rx { font-size: 40pt; float: right; }
+          </style>
+        </head>
+        <body>
+          <div style="width: 210mm; height: 297mm; display: flex;">
+            <div style="flex: 1; padding: 10mm;">
+               ${document.querySelector('.main-content')?.innerHTML}
+            </div>
+            <div style="width: 65mm; background: #f9f9f9; padding: 10mm;">
+               ${document.querySelector('.sidebar-info')?.innerHTML}
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], { type: "application/msword" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Noskha-${patient.name}-${new Date().toLocaleDateString('fa-AF')}.doc`;
+    link.click();
+  };
+
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-slate-200 no-print-container font-sans" dir="rtl">
-      {/* Settings Panel (Sidebar) */}
-      <aside className={`no-print bg-white border-l border-slate-300 transition-all duration-300 overflow-y-auto h-screen sticky top-0 z-50 shadow-2xl flex flex-col ${isSidebarCollapsed ? 'w-0 md:w-12' : 'w-full md:w-72'}`}>
-        {isSidebarCollapsed ? (
-          <div className="p-2 flex flex-col items-center gap-4 pt-10">
-             <button onClick={() => setIsSidebarCollapsed(false)} className="p-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-all">
-               <PanelLeftOpen className="w-5 h-5" />
-             </button>
-             <button onClick={handlePrint} className="p-2 bg-indigo-700 text-white rounded-lg shadow-lg" title="چاپ">
-               <Printer className="w-5 h-5" />
-             </button>
-             <button onClick={onEdit} className="p-2 bg-orange-100 text-orange-700 rounded-lg shadow-sm" title="ویرایش">
-               <Edit3 className="w-5 h-5" />
-             </button>
-          </div>
-        ) : (
-          <div className="p-5 space-y-6 flex-1 flex flex-col text-right">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 flex-row-reverse">
-              <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2 flex-row-reverse">
-                <Layout className="w-5 h-5 text-indigo-600" />
-                تنظیمات چاپ
-              </h2>
-              <button onClick={() => setIsSidebarCollapsed(true)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400">
-                <PanelLeftClose className="w-5 h-5" />
-              </button>
-            </div>
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-200 no-print font-sans" dir="rtl">
+      {/* Sidebar Controls */}
+      <aside className="no-print bg-white border-l border-slate-300 w-full md:w-80 h-screen sticky top-0 p-6 flex flex-col gap-6 shadow-2xl overflow-y-auto">
+        <h2 className="text-xl font-bold text-slate-800 text-right">تنظیمات نهایی چاپ</h2>
+        <div className="space-y-4">
+          <button onClick={printPrescription} className="print-btn-custom w-full shadow-lg">
+            <Printer className="w-6 h-6" /> 🖨 چاپ مستقیم نسخه
+          </button>
+          
+          <button onClick={exportWord} className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700 transition-all active:scale-95">
+            <FileDown className="w-6 h-6" /> خروجی فایل Word
+          </button>
 
-            <div className="flex-1 space-y-6 overflow-y-auto pr-1 custom-scroll">
-              <div className="space-y-4">
-                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2 flex-row-reverse">
-                  <Scaling className="w-3 h-3" /> تنظیمات صفحه
-                </h3>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500">سایز کاغذ:</label>
-                    <select value={pageSize} onChange={e => setPageSize(e.target.value as any)} className="w-full p-2.5 bg-slate-50 border-none rounded-xl text-sm outline-none">
-                      <option value="A4">A4 (استاندارد)</option>
-                      <option value="A5">A5 (کوچک)</option>
-                      <option value="Letter">Letter</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500">جهت صفحه:</label>
-                    <div className="flex bg-slate-50 p-1 rounded-xl">
-                      <button onClick={() => setOrientation('portrait')} className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${orientation === 'portrait' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>عمودی</button>
-                      <button onClick={() => setOrientation('landscape')} className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${orientation === 'landscape' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}>افقی</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-slate-50">
-                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2 flex-row-reverse">
-                  <TypeIcon className="w-3 h-3" /> تایپوگرافی
-                </h3>
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-500 flex justify-between flex-row-reverse">سایز متن: <span>{fontSize}px</span></label>
-                    <input type="range" min="10" max="24" value={fontSize} onChange={e => setFontSize(parseInt(e.target.value))} className="w-full accent-indigo-600 h-1.5 bg-slate-100 rounded-lg cursor-pointer" />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500">نوع قلم:</label>
-                    <select value={fontFamily} onChange={e => setFontFamily(e.target.value)} className="w-full p-2.5 bg-slate-50 border-none rounded-xl text-sm outline-none">
-                      <option value="Vazirmatn">Vazirmatn</option>
-                      <option value="system-ui">System UI</option>
-                      <option value="serif">Serif</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4 pt-4 border-t border-slate-50">
-                <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center gap-2 flex-row-reverse">
-                  <Move className="w-3 h-3" /> حاشیه
-                </h3>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 flex justify-between flex-row-reverse">سفیدی لبه: <span>{margin}mm</span></label>
-                  <input type="range" min="0" max="40" value={margin} onChange={e => setMargin(parseInt(e.target.value))} className="w-full accent-indigo-600 h-1.5 bg-slate-100 rounded-lg cursor-pointer" />
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t border-slate-50">
-                <Toggle label="واتر مارک" active={showWatermark} onClick={() => setShowWatermark(!showWatermark)} />
-                <Toggle label="فوتر آدرس" active={showFooter} onClick={() => setShowFooter(!showFooter)} />
-                <Toggle label="خط امضا" active={showSignature} onClick={() => setShowSignature(!showSignature)} />
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-slate-100 space-y-2">
-              <button onClick={handlePrint} className="w-full bg-indigo-700 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-800 transition-all">
-                <Printer className="w-5 h-5" /> چاپ مستقیم نسخه
-              </button>
-              <button onClick={onEdit} className="w-full bg-orange-600 text-white p-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-orange-700 transition-all">
-                <Edit3 className="w-5 h-5" /> ویرایش مجدد نسخه
-              </button>
-              <button onClick={onBack} className="w-full text-slate-400 p-2 text-xs hover:text-red-500 transition-colors">بازگشت به خانه</button>
-            </div>
-          </div>
-        )}
+          <button onClick={onEdit} className="w-full bg-amber-600 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-amber-700 transition-all active:scale-95">
+            <Edit3 className="w-6 h-6" /> ویرایش محتوا
+          </button>
+          
+          <button onClick={onBack} className="w-full text-slate-400 p-2 text-sm hover:text-red-500 transition-colors">انصراف و بازگشت</button>
+        </div>
+        
+        <div className="mt-auto p-5 bg-teal-50 rounded-[2rem] border border-teal-100 text-[11px] text-teal-800 leading-relaxed text-right">
+          چیدمان استاندارد (Royal Style) استفاده می‌شود. دواها در سمت راست و اطلاعات علائم حیاتی در سمت چپ چاپ خواهند شد.
+        </div>
       </aside>
 
-      {/* Real Paper Preview Area */}
-      <div className="flex-1 flex flex-col items-center overflow-auto p-4 md:p-12 pb-32 bg-slate-300 relative">
-        <div 
-          className="relative transition-all duration-500 flex items-center justify-center"
-          style={{ padding: '20px' }}
-        >
-          {/* Main Print Container Wrapper */}
-          <div 
-            id="print-area"
-          >
-            <style>{`
-              /* ظاهر عادی اپ - هماهنگ با درخواست کاربر */
-              .rx-page {
-                width: 210mm;
-                min-height: 297mm;
-                background: white;
-                padding: ${margin}mm;
-                box-sizing: border-box;
-                font-family: ${fontFamily}, "Segoe UI", Tahoma, sans-serif;
-                color: #000;
-                position: relative;
-                display: flex;
-                flex-direction: column;
-                text-align: right;
-                direction: rtl;
-                box-shadow: 0 30px 100px rgba(0,0,0,0.3);
-              }
-
-              .header {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                border-bottom: 2px solid #000;
-                padding-bottom: 5mm;
-              }
-
-              .doctor-info h3 {
-                font-size: 1.5rem;
-                font-weight: bold;
-                margin: 0;
-                color: #000;
-              }
-
-              .doctor-info p {
-                font-size: 1rem;
-                margin: 2px 0;
-                color: #000;
-              }
-
-              .rx {
-                font-size: 32px;
-                font-weight: bold;
-                direction: ltr;
-                font-family: serif;
-              }
-
-              .patient-info {
-                margin-top: 10mm;
-                display: grid;
-                grid-template-columns: repeat(2, 1fr);
-                gap: 5mm;
-                border-bottom: 1px solid #eee;
-                padding-bottom: 5mm;
-                font-size: 1rem;
-              }
-
-              .diagnosis {
-                margin-top: 10mm;
-              }
-
-              .diagnosis strong {
-                font-weight: bold;
-                font-size: 1.1rem;
-              }
-
-              .diagnosis p {
-                margin-top: 2mm;
-                font-size: 1.2rem;
-                font-weight: bold;
-              }
-
-              .medicines {
-                margin-top: 8mm;
-                min-height: 120mm;
-                direction: ltr;
-                text-align: left;
-                flex: 1;
-              }
-
-              .medicines ol {
-                list-style: decimal inside;
-                padding: 0;
-              }
-
-              .medicines li {
-                font-size: ${fontSize}px;
-                line-height: ${lineHeight};
-                margin-bottom: 5mm;
-                border-bottom: 1px solid #f9f9f9;
-                padding-bottom: 3mm;
-              }
-
-              .footer {
-                position: absolute;
-                bottom: 20mm;
-                left: ${margin}mm;
-                right: ${margin}mm;
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-end;
-                border-top: 1px solid #eee;
-                padding-top: 5mm;
-              }
-
-              .doctor-signature {
-                text-align: center;
-                border-top: 1px solid #000;
-                padding-top: 2mm;
-                min-width: 50mm;
-                font-size: 0.9rem;
-              }
-
-              .clinic-footer-info {
-                text-align: right;
-                direction: rtl;
-              }
-
-              .clinic-footer-info p {
-                margin: 1px 0;
-                font-size: 0.85rem;
-              }
-
-              /* 🔴🔴 مخصوص چاپ 🔴🔴 */
-              @media print {
-                body {
-                  margin: 0 !important;
-                  background: white !important;
-                  -webkit-print-color-adjust: exact;
-                }
-
-                /* مخفی کردن تمام اجزا بجای منطقه چاپ */
-                body * {
-                  visibility: hidden;
-                }
-
-                #print-area,
-                #print-area * {
-                  visibility: visible;
-                }
-
-                #print-area {
-                  position: absolute;
-                  left: 0;
-                  top: 0;
-                  width: 210mm !important;
-                  height: 297mm !important;
-                  box-shadow: none !important;
-                  transform: none !important;
-                }
-
-                .rx-page {
-                  box-shadow: none !important;
-                  width: 210mm !important;
-                  height: 297mm !important;
-                  margin: 0 !important;
-                  padding: ${margin}mm !important;
-                }
-
-                @page {
-                  size: A4;
-                  margin: 0;
-                }
-              }
-            `}</style>
-
-            <div className="rx-page">
-              <div className="header">
-                <div className="doctor-info">
-                  <h3>{settings.doctor}</h3>
-                  <p>{settings.specialty}</p>
-                  <p>شماره نظام پزشکی: {settings.tagline}</p>
+      {/* Printing Surface (Preview) */}
+      <div className="flex-1 overflow-auto bg-slate-200 rx-preview-container">
+        <div className="print-area shadow-2xl" id="printArea">
+          {/* Main Area (Right Column in A4 structure) */}
+          <div className="main-content">
+            <div className="rx-symbol">Rx</div>
+            <div className="clinic-tag">:N.M.C</div>
+            
+            <div className="meds-list-container">
+              {prescription.diagnosis && (
+                <div style={{direction: 'rtl', textAlign: 'right', marginBottom: '10mm', fontSize: '14pt'}}>
+                   <strong>Dx:</strong> {prescription.diagnosis}
                 </div>
-                <div className="rx">Rx</div>
-              </div>
+              )}
+              <ol className="list-decimal space-y-4">
+                {prescription.medications.map((m: Medication, idx: number) => (
+                  <li key={m.id || idx} className="border-b border-dashed border-gray-200 pb-2">
+                    <div className="text-xl font-bold">{m.name} {m.strength}</div>
+                    <div className="text-sm text-gray-500 italic mt-1">{m.instructions} {m.quantity ? `(${m.quantity})` : ''}</div>
+                  </li>
+                ))}
+              </ol>
+            </div>
 
-              <div className="patient-info">
-                <div><strong>نام بیمار:</strong> {patient.name}</div>
-                <div><strong>سن:</strong> {patient.age}</div>
-                <div><strong>وزن:</strong> {prescription.clinicalRecords.wt || '--'} kg</div>
-                <div><strong>تاریخ:</strong> {new Date(prescription.date).toLocaleDateString('fa-AF')}</div>
-              </div>
+            <div className="signature-area">
+              DOCTOR'S SIGNATURE
+            </div>
+          </div>
 
-              <div className="diagnosis">
-                <strong>تشخیص (Diagnosis):</strong>
-                <p>{prescription.diagnosis}</p>
+          {/* Sidebar (Left Column) */}
+          <div className="sidebar-info">
+            <div className="mb-10">
+              <h3 className="text-xl font-bold mb-6">دکتر</h3>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-[8pt] text-gray-400 uppercase tracking-wider">PATIENT</div>
+                  <div className="text-lg font-bold">{patient.name}</div>
+                  <div className="text-sm">{patient.age} ساله</div>
+                  <div className="text-sm text-gray-500">{new Date(prescription.date).toLocaleDateString('fa-AF')}</div>
+                </div>
               </div>
+            </div>
 
-              <div className="medicines">
-                <ol>
-                  {prescription.medications.map((m: Medication, idx: number) => (
-                    <li key={m.id || idx}>
-                      <strong>{m.name} {m.strength}</strong> — {m.instructions}
-                    </li>
-                  ))}
-                </ol>
+            <div className="mt-4">
+              <div className="text-[8pt] text-gray-400 uppercase tracking-wider mb-6">VITALS</div>
+              <div className="grid grid-cols-2 gap-y-6 gap-x-2 text-center border-t border-gray-100 pt-4">
+                <div>
+                  <div className="text-[7pt] text-gray-400">PR</div>
+                  <div className="font-bold text-sm">{prescription.clinicalRecords.pr || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-[7pt] text-gray-400">BP</div>
+                  <div className="font-bold text-sm">{prescription.clinicalRecords.bp || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-[7pt] text-gray-400">Temp</div>
+                  <div className="font-bold text-sm">{prescription.clinicalRecords.temp || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-[7pt] text-gray-400">RR</div>
+                  <div className="font-bold text-sm">{prescription.clinicalRecords.hr || '-'}</div>
+                </div>
               </div>
+              <div className="mt-8 text-center border-t border-gray-100 pt-4">
+                <div className="text-[7pt] text-gray-400">Weight</div>
+                <div className="font-bold text-sm">kg {prescription.clinicalRecords.wt || '0'}</div>
+              </div>
+            </div>
 
-              <div className="footer">
-                <div className="doctor-signature">مهر و امضا داکتر</div>
-                {showFooter && (
-                  <div className="clinic-footer-info">
-                    <p style={{ fontWeight: 'bold' }}>{settings.name}</p>
-                    <p>{settings.address}</p>
-                    <p style={{ direction: 'ltr', textAlign: 'right' }}>{settings.phone}</p>
-                  </div>
-                )}
-              </div>
+            <div className="mt-auto pt-10 text-[7pt] text-gray-300 leading-tight">
+              {settings.name}<br/>
+              {settings.phone}
             </div>
           </div>
         </div>
@@ -864,15 +661,6 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack, onEd
     </div>
   );
 };
-
-const Toggle = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
-  <button onClick={onClick} className="w-full flex justify-between items-center p-2 rounded-lg hover:bg-slate-50 transition-colors flex-row-reverse">
-    <span className="text-[11px] font-bold text-slate-600">{label}</span>
-    <div className={`w-8 h-4 rounded-full transition-all relative ${active ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-      <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${active ? 'left-4.5' : 'left-0.5'}`}></div>
-    </div>
-  </button>
-);
 
 const DrugSettings = ({ db }: { db: IDBDatabase }) => {
   const [newDrug, setNewDrug] = useState({ name: '', strength: '', instructions: '', category: '' });
