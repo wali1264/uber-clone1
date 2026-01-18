@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, 
   History, 
@@ -19,9 +19,14 @@ import {
   Database, 
   Key,
   FileDown,
-  Edit3
+  Edit3,
+  Image as ImageIcon,
+  Save,
+  RotateCcw,
+  FileText,
+  File
 } from 'lucide-react';
-import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings } from './types';
+import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings, PrintLayoutSettings } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS } from './constants';
 
 // --- Database Configuration ---
@@ -65,7 +70,7 @@ const MEDICAL_DIAGNOSES = [
   { cat: 'Endocrine', items: ['Diabetes Mellitus Type 2', 'Diabetes Mellitus Type 1', 'Hypothyroidism', 'Hyperthyroidism', 'Dyslipidemia', 'Vitamin D Deficiency', 'Polycystic Ovary Syndrome'] },
   { cat: 'Infectious', items: ['Enteric Fever (Typhoid)', 'Malaria (Falciparum)', 'Malaria (Vivax)', 'Urinary Tract Infection', 'Acute Pyelonephritis', 'Sepsis', 'Meningitis', 'Brucellosis'] },
   { cat: 'Neurological', items: ['Migraine', 'Tension Headache', 'Ischemic Stroke', 'Transient Ischemic Attack', 'Epilepsy', 'Peripheral Neuropathy', 'BPPV / Vertigo'] },
-  { cat: 'Orthopedic', items: ['Osteoarthritis', 'Rheumatoid Arthritis', 'Lumbar Radiculopathy', 'Cervical Spondylosis', 'Osteoporosis', 'Fibromyalgia', 'Gouty Arthritis'] },
+  { cat: 'Orthopedic', items: ['Osteoarthritis', 'Rheumatoid Arthritis', 'Lumbar Radiculopathy', 'Cervical Spondylosis', 'Osteoporosis', 'Fibromyalgia', 'Gouty arthritis'] },
   { cat: 'Dermatology', items: ['Eczema / Dermatitis', 'Urticaria', 'Fungal Skin Infection', 'Scabies', 'Acne Vulgaris', 'Psoriasis', 'Herpes Zoster'] }
 ];
 
@@ -110,7 +115,11 @@ const App: React.FC = () => {
 
       if (savedPatients) setPatients(JSON.parse(savedPatients));
       if (savedPrescriptions) setPrescriptions(JSON.parse(savedPrescriptions));
-      if (savedSettings) setClinicSettings(JSON.parse(savedSettings));
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        if (!settings.printLayout) settings.printLayout = DEFAULT_CLINIC_SETTINGS.printLayout;
+        setClinicSettings(settings);
+      }
       if (savedPin) setStoredPin(savedPin);
       if (savedLogin === 'true') setIsLoggedIn(true);
     };
@@ -284,7 +293,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <nav className="bg-white/95 backdrop-blur-md border-t border-gray-100 fixed bottom-0 left-0 right-0 max-w-lg mx-auto flex justify-around items-center p-4 z-40 no-print rounded-t-3xl shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
+      <nav className="bg-white/95 backdrop-blur-md border-t border-gray-100 fixed bottom-0 left-0 right-0 max-w-lg mx-auto flex justify-around items-center p-4 z-40 no-print rounded-t-3xl shadow-[0_-10px_30_rgba(0,0,0,0.05)]">
         <NavBtn active={view === 'HOME'} icon={<Home />} label="اصلی" onClick={() => setView('HOME')} />
         <NavBtn active={view === 'PATIENTS' || view === 'NEW_PATIENT' || view === 'NEW_PRESCRIPTION'} icon={<Users />} label="مریضان" onClick={() => { setDraftPrescription(null); setView('PATIENTS'); }} />
         <NavBtn active={view === 'PRESCRIPTION_HISTORY'} icon={<History />} label="تاریخچه" onClick={() => setView('PRESCRIPTION_HISTORY')} />
@@ -407,107 +416,88 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
       </div>
 
       <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4 text-right">
-        <div className="flex justify-between items-center flex-row-reverse border-b border-gray-50 pb-3">
-          <h3 className="text-sm font-bold text-gray-800">شکایت اصلی (Chief Complaint)</h3>
+        <div className="flex justify-between items-center flex-row-reverse border-b border-gray-50 pb-2 mb-2">
+          <h3 className="text-xs font-bold text-indigo-700">شکایت مریض (C/C)</h3>
+          <div className="flex gap-2">
+            <input className="text-[10px] p-2 bg-gray-50 rounded-lg outline-none" placeholder="جستجو شکایت..." value={ccSearch} onChange={e => setCcSearch(e.target.value)} />
+          </div>
         </div>
-        <div className="relative mb-2">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
-          <input className="w-full p-3 pr-10 bg-gray-50 border-none rounded-xl text-xs text-right outline-none shadow-inner" placeholder="جستجوی علائم..." value={ccSearch} onChange={e => setCcSearch(e.target.value)} />
-        </div>
-        <div className="space-y-4 max-h-[200px] overflow-y-auto pr-1 custom-scroll">
-          {MEDICAL_CC_CATEGORIES.map(category => {
-            const items = category.items.filter(i => i.toLowerCase().includes(ccSearch.toLowerCase()));
-            if (ccSearch && items.length === 0) return null;
-            return (
-              <div key={category.cat} className="space-y-2">
-                <div className="text-[9px] font-black text-indigo-400 border-b border-indigo-50/50 pb-1 text-right uppercase tracking-[1px]">{category.cat}</div>
-                <div className="flex flex-wrap gap-2 flex-row-reverse">
-                  {items.map(item => (
-                    <button key={item} onClick={() => toggleCCTerm(item)} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isCCSelected(item) ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}>
-                      {item}{isCCSelected(item) && <CheckCircle2 className="w-3 h-3" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <textarea className="w-full p-4 rounded-2xl bg-gray-50 border-none text-sm text-left font-mono min-h-[70px] focus:ring-2 focus:ring-indigo-500 shadow-inner outline-none" placeholder="Selected symptoms..." value={cc} onChange={e => setCc(e.target.value)} />
-      </div>
-
-      <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4 text-right">
-        <div className="flex justify-between items-center flex-row-reverse border-b border-gray-50 pb-3">
-          <h3 className="text-sm font-bold text-gray-800">تشخیص (Medical Diagnosis)</h3>
-          <span className="text-[9px] text-indigo-500 font-black uppercase tracking-[1px]">Select English Terms</span>
-        </div>
-        <div className="relative mb-2">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 w-4 h-4" />
-          <input className="w-full p-3 pr-10 bg-gray-50 border-none rounded-xl text-xs text-right outline-none shadow-inner" placeholder="جستجوی تشخیص..." value={diagSearch} onChange={e => setDiagSearch(e.target.value)} />
-        </div>
-        <div className="space-y-4 max-h-[200px] overflow-y-auto pr-1 custom-scroll">
-          {MEDICAL_DIAGNOSES.map(category => {
-            const items = category.items.filter(i => i.toLowerCase().includes(diagSearch.toLowerCase()));
-            if (diagSearch && items.length === 0) return null;
-            return (
-              <div key={category.cat} className="space-y-2">
-                <div className="text-[9px] font-black text-indigo-400 border-b border-indigo-50/50 pb-1 text-right uppercase tracking-[1px]">{category.cat}</div>
-                <div className="flex flex-wrap gap-2 flex-row-reverse">
-                  {items.map(item => (
-                    <button key={item} onClick={() => selectDiagnosis(item)} className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${diagnosis === item ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}>
-                      {item}{diagnosis === item && <CheckCircle2 className="w-3 h-3" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <textarea className="w-full p-5 rounded-[2rem] bg-gray-50 border-none shadow-inner text-sm text-right min-h-[100px] focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Enter clinical diagnosis..." value={diagnosis} onChange={e => setDiagnosis(e.target.value)} />
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex justify-between items-center flex-row-reverse px-1">
-          <h3 className="font-bold text-gray-800 flex items-center gap-2 flex-row-reverse">Rx - لیست تداوی <Activity className="w-5 h-5 text-indigo-600" /></h3>
-          <button onClick={() => setShowDrugList(true)} className="text-xs font-bold text-indigo-700 bg-indigo-50 px-4 py-2.5 rounded-xl hover:bg-indigo-100 transition-all">+ انتخاب از بانک</button>
-        </div>
-        <div className="space-y-3">
-          {meds.map((m, i) => (
-            <div key={m.id || i} className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm relative animate-in slide-in-from-right duration-300 text-right">
-               <button onClick={() => setMeds(meds.filter((_, idx) => idx !== i))} className="absolute top-4 left-4 text-gray-200 hover:text-red-500 transition-colors"><X className="w-5 h-5" /></button>
-               <input className="w-full font-black text-indigo-900 border-none p-0 text-lg text-right mb-4 focus:ring-0 outline-none" placeholder="نام دوا" value={m.name} onChange={e => { const n = [...meds]; n[i].name = e.target.value; setMeds(n); }} />
-               <div className="grid grid-cols-2 gap-3 mb-3">
-                 <input className="text-xs bg-gray-50 p-3.5 rounded-xl border-none text-right focus:ring-1 focus:ring-indigo-300 shadow-inner outline-none" placeholder="دوز" value={m.strength} onChange={e => { const n = [...meds]; n[i].strength = e.target.value; setMeds(n); }} />
-                 <input className="text-xs bg-gray-50 p-3.5 rounded-xl border-none text-right focus:ring-1 focus:ring-indigo-300 shadow-inner outline-none" placeholder="تعداد" value={m.quantity} onChange={e => { const n = [...meds]; n[i].quantity = e.target.value; setMeds(n); }} />
-               </div>
-               <textarea className="w-full text-xs bg-gray-50 p-3.5 rounded-xl border-none text-right focus:ring-1 focus:ring-indigo-300 min-h-[60px] shadow-inner outline-none" placeholder="هدایات" value={m.instructions} onChange={e => { const n = [...meds]; n[i].instructions = e.target.value; setMeds(n); }} />
-            </div>
+        <textarea className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none min-h-[80px]" value={cc} onChange={e => setCc(e.target.value)} placeholder="شکایت مریض را اینجا بنویسید..." />
+        <div className="flex flex-wrap gap-1 mt-2 justify-end">
+          {MEDICAL_CC_CATEGORIES.flatMap(c => c.items).filter(i => !ccSearch || i.toLowerCase().includes(ccSearch.toLowerCase())).slice(0, 15).map(item => (
+            <button key={item} onClick={() => toggleCCTerm(item)} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all ${isCCSelected(item) ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{item}</button>
           ))}
         </div>
       </div>
 
-      <button onClick={() => onSubmit({ patientId: patient.id, cc, diagnosis, clinicalRecords: records, medications: meds })} className="w-full bg-indigo-700 text-white p-5 rounded-[2rem] font-bold shadow-xl active:scale-95 transition-transform text-lg">مشاهده و چاپ نسخه</button>
+      <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4 text-right">
+        <div className="flex justify-between items-center flex-row-reverse border-b border-gray-50 pb-2 mb-2">
+          <h3 className="text-xs font-bold text-red-700">تشخیص (Diagnosis)</h3>
+          <input className="text-[10px] p-2 bg-gray-50 rounded-lg outline-none" placeholder="جستجو تشخیص..." value={diagSearch} onChange={e => setDiagSearch(e.target.value)} />
+        </div>
+        <input className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-red-500 outline-none" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} placeholder="تشخیص احتمالی یا قطعی..." />
+        <div className="flex flex-wrap gap-1 mt-2 justify-end">
+          {MEDICAL_DIAGNOSES.flatMap(c => c.items).filter(i => !diagSearch || i.toLowerCase().includes(diagSearch.toLowerCase())).slice(0, 15).map(item => (
+            <button key={item} onClick={() => selectDiagnosis(item)} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all ${diagnosis === item ? 'bg-red-600 text-white shadow-md' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{item}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-4 text-right">
+        <div className="flex justify-between items-center flex-row-reverse border-b border-gray-50 pb-3">
+          <h3 className="text-xs font-bold text-indigo-700">اقلام دوایی (Meds)</h3>
+          <button onClick={() => setShowDrugList(true)} className="bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 active:scale-95 transition-all shadow-md"><Plus className="w-4 h-4" /> افزودن دوا</button>
+        </div>
+        
+        <div className="space-y-3">
+          {meds.map((m, idx) => (
+            <div key={idx} className="bg-gray-50 p-4 rounded-2xl flex flex-col gap-2 group relative animate-in slide-in-from-right-2">
+              <button onClick={() => setMeds(meds.filter((_, i) => i !== idx))} className="absolute top-2 left-2 p-1.5 text-gray-300 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100"><Trash2 className="w-4 h-4" /></button>
+              <div className="flex justify-between items-center flex-row-reverse">
+                <span className="font-bold text-indigo-900 text-sm ltr">{m.name}</span>
+                <input className="bg-transparent border-none text-[10px] font-black text-indigo-500 w-16 focus:ring-0 text-center" value={m.strength} onChange={e => {
+                  const n = [...meds];
+                  n[idx].strength = e.target.value;
+                  setMeds(n);
+                }} />
+              </div>
+              <input className="w-full bg-white/50 border-none rounded-lg p-2 text-[10px] font-bold text-right outline-none focus:ring-1 focus:ring-indigo-300" value={m.instructions} onChange={e => {
+                const n = [...meds];
+                n[idx].instructions = e.target.value;
+                setMeds(n);
+              }} />
+            </div>
+          ))}
+          {meds.length === 0 && <div className="text-center py-6 text-gray-300 text-[10px] font-bold">دوا انتخاب نشده است</div>}
+        </div>
+      </div>
+
+      <button onClick={() => onSubmit({ patientId: patient.id, cc, diagnosis, medications: meds, clinicalRecords: records })} className="w-full bg-gradient-to-r from-indigo-700 to-blue-800 text-white p-5 rounded-[2rem] font-bold shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all mb-10"><CheckCircle2 className="w-6 h-6" /> چاپ و ذخیره نسخه نهایی</button>
 
       {showDrugList && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 max-h-[85vh] flex flex-col shadow-2xl animate-in zoom-in duration-300 text-right">
-            <div className="flex justify-between items-center mb-6 border-b border-gray-50 pb-4 flex-row-reverse">
-              <span className="font-bold text-xl text-gray-800">بانک دواها</span>
-              <button onClick={() => setShowDrugList(false)} className="p-2.5 bg-gray-50 hover:bg-red-50 hover:text-red-500 rounded-full transition-all"><X className="w-6 h-6" /></button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] p-4 flex items-end">
+          <div className="w-full max-sm:max-w-lg mx-auto bg-white rounded-[3rem] p-6 space-y-4 animate-in slide-in-from-bottom duration-300 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center px-2">
+              <button onClick={() => setShowDrugList(false)} className="p-2 bg-gray-100 rounded-full"><X className="w-5 h-5 text-gray-500" /></button>
+              <h3 className="font-bold text-indigo-900">لیست دواهای سیستم</h3>
             </div>
-            <div className="relative mb-6 group">
-              <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-indigo-600" />
-              <input className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 outline-none text-right text-sm shadow-inner focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="جستجوی سریع..." value={drugSearchQuery} onChange={e => setDrugSearchQuery(e.target.value)} autoFocus />
+            <div className="relative">
+              <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input className="w-full bg-gray-50 border-none rounded-2xl py-4 pr-12 pl-4 outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold text-sm" placeholder="جستجوی نام دوا یا برند..." value={drugSearchQuery} onChange={e => setDrugSearchQuery(e.target.value)} />
             </div>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scroll">
-              <button onClick={() => { setMeds([...meds, { id: Math.random().toString(), name: '', strength: '', quantity: '', instructions: '' }]); setShowDrugList(false); }} className="w-full p-4.5 bg-indigo-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform"><Plus className="w-5 h-5" /> دوای جدید (دستی)</button>
-              <div className="pt-2">
-                {drugResults.map(t => (
-                  <div key={t.id} onClick={() => { setMeds([...meds, { id: Math.random().toString(), name: t.name, strength: t.defaultStrength, quantity: '', instructions: t.defaultInstructions }]); setShowDrugList(false); }} className="p-4 border border-gray-100 rounded-2xl hover:bg-indigo-50 cursor-pointer group transition-all active:scale-[0.98] mb-2">
-                    <div className="font-bold text-gray-800 group-hover:text-indigo-700 transition-colors">{t.name} <span className="text-[9px] opacity-40 font-normal">({t.brandNames?.split(',')[0]})</span></div>
-                    <div className="text-[10px] text-gray-400 mt-1 font-medium italic">{t.defaultStrength} — {t.category}</div>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+              {drugResults.map(drug => (
+                <div key={drug.id} onClick={() => {
+                  setMeds([...meds, { id: Math.random().toString(), name: drug.name, strength: drug.defaultStrength, quantity: '1', instructions: drug.defaultInstructions }]);
+                  setShowDrugList(false);
+                }} className="bg-gray-50 p-4 rounded-2xl flex justify-between items-center hover:bg-indigo-50 cursor-pointer transition-all active:scale-[0.98]">
+                  <div className="text-[10px] font-bold text-indigo-400 bg-white px-3 py-1.5 rounded-xl shadow-sm ltr">{drug.defaultStrength}</div>
+                  <div className="text-right">
+                    <div className="font-bold text-indigo-900 ltr">{drug.name}</div>
+                    <div className="text-[9px] text-gray-400 font-bold">{drug.brandNames || drug.category}</div>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -516,268 +506,274 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   );
 };
 
-const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack, onEdit }: any) => {
-  const printPrescription = () => {
-    window.print();
-  };
-
-  const exportWord = () => {
-    const content = document.getElementById("printArea")?.innerHTML;
-    if (!content) return;
-
-    const html = `
-      <html dir="rtl">
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Tahoma', 'Arial', sans-serif; padding: 20mm; direction: rtl; text-align: right; }
-            .sidebar { width: 30%; float: left; background: #f9f9f9; padding: 10mm; }
-            .content { width: 70%; float: right; padding: 10mm; }
-            .rx { font-size: 40pt; float: right; }
-          </style>
-        </head>
-        <body>
-          <div style="width: 210mm; height: 297mm; display: flex;">
-            <div style="flex: 1; padding: 10mm;">
-               ${document.querySelector('.main-content')?.innerHTML}
-            </div>
-            <div style="width: 65mm; background: #f9f9f9; padding: 10mm;">
-               ${document.querySelector('.sidebar-info')?.innerHTML}
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-
-    const blob = new Blob([html], { type: "application/msword" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `Noskha-${patient.name}-${new Date().toLocaleDateString('fa-AF')}.doc`;
-    link.click();
-  };
-
-  return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-slate-200 no-print font-sans" dir="rtl">
-      {/* Sidebar Controls */}
-      <aside className="no-print bg-white border-l border-slate-300 w-full md:w-80 h-screen sticky top-0 p-6 flex flex-col gap-6 shadow-2xl overflow-y-auto">
-        <h2 className="text-xl font-bold text-slate-800 text-right">تنظیمات نهایی چاپ</h2>
-        <div className="space-y-4">
-          <button onClick={printPrescription} className="print-btn-custom w-full shadow-lg">
-            <Printer className="w-6 h-6" /> 🖨 چاپ مستقیم نسخه
-          </button>
-          
-          <button onClick={exportWord} className="w-full bg-indigo-600 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700 transition-all active:scale-95">
-            <FileDown className="w-6 h-6" /> خروجی فایل Word
-          </button>
-
-          <button onClick={onEdit} className="w-full bg-amber-600 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-amber-700 transition-all active:scale-95">
-            <Edit3 className="w-6 h-6" /> ویرایش محتوا
-          </button>
-          
-          <button onClick={onBack} className="w-full text-slate-400 p-2 text-sm hover:text-red-500 transition-colors">انصراف و بازگشت</button>
-        </div>
-        
-        <div className="mt-auto p-5 bg-teal-50 rounded-[2rem] border border-teal-100 text-[11px] text-teal-800 leading-relaxed text-right">
-          چیدمان استاندارد (Royal Style) استفاده می‌شود. دواها در سمت راست و اطلاعات علائم حیاتی در سمت چپ چاپ خواهند شد.
-        </div>
-      </aside>
-
-      {/* Printing Surface (Preview) */}
-      <div className="flex-1 overflow-auto bg-slate-200 rx-preview-container">
-        <div className="print-area shadow-2xl" id="printArea">
-          {/* Main Area (Right Column in A4 structure) */}
-          <div className="main-content">
-            <div className="rx-symbol">Rx</div>
-            <div className="clinic-tag">:N.M.C</div>
-            
-            <div className="meds-list-container">
-              {prescription.diagnosis && (
-                <div style={{direction: 'rtl', textAlign: 'right', marginBottom: '10mm', fontSize: '14pt'}}>
-                   <strong>Dx:</strong> {prescription.diagnosis}
-                </div>
-              )}
-              <ol className="list-decimal space-y-4">
-                {prescription.medications.map((m: Medication, idx: number) => (
-                  <li key={m.id || idx} className="border-b border-dashed border-gray-200 pb-2">
-                    <div className="text-xl font-bold">{m.name} {m.strength}</div>
-                    <div className="text-sm text-gray-500 italic mt-1">{m.instructions} {m.quantity ? `(${m.quantity})` : ''}</div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-
-            <div className="signature-area">
-              DOCTOR'S SIGNATURE
-            </div>
-          </div>
-
-          {/* Sidebar (Left Column) */}
-          <div className="sidebar-info">
-            <div className="mb-10">
-              <h3 className="text-xl font-bold mb-6">دکتر</h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="text-[8pt] text-gray-400 uppercase tracking-wider">PATIENT</div>
-                  <div className="text-lg font-bold">{patient.name}</div>
-                  <div className="text-sm">{patient.age} ساله</div>
-                  <div className="text-sm text-gray-500">{new Date(prescription.date).toLocaleDateString('fa-AF')}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="text-[8pt] text-gray-400 uppercase tracking-wider mb-6">VITALS</div>
-              <div className="grid grid-cols-2 gap-y-6 gap-x-2 text-center border-t border-gray-100 pt-4">
-                <div>
-                  <div className="text-[7pt] text-gray-400">PR</div>
-                  <div className="font-bold text-sm">{prescription.clinicalRecords.pr || '-'}</div>
-                </div>
-                <div>
-                  <div className="text-[7pt] text-gray-400">BP</div>
-                  <div className="font-bold text-sm">{prescription.clinicalRecords.bp || '-'}</div>
-                </div>
-                <div>
-                  <div className="text-[7pt] text-gray-400">Temp</div>
-                  <div className="font-bold text-sm">{prescription.clinicalRecords.temp || '-'}</div>
-                </div>
-                <div>
-                  <div className="text-[7pt] text-gray-400">RR</div>
-                  <div className="font-bold text-sm">{prescription.clinicalRecords.hr || '-'}</div>
-                </div>
-              </div>
-              <div className="mt-8 text-center border-t border-gray-100 pt-4">
-                <div className="text-[7pt] text-gray-400">Weight</div>
-                <div className="font-bold text-sm">kg {prescription.clinicalRecords.wt || '0'}</div>
-              </div>
-            </div>
-
-            <div className="mt-auto pt-10 text-[7pt] text-gray-300 leading-tight">
-              {settings.name}<br/>
-              {settings.phone}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const DrugSettings = ({ db }: { db: IDBDatabase }) => {
-  const [newDrug, setNewDrug] = useState({ name: '', strength: '', instructions: '', category: '' });
+  const [drugs, setDrugs] = useState<DrugTemplate[]>([]);
   const [search, setSearch] = useState('');
-  const [results, setResults] = useState<DrugTemplate[]>([]);
+  const [editing, setEditing] = useState<Partial<DrugTemplate> | null>(null);
 
-  const loadDrugs = async () => {
-    const q = search.toLowerCase().trim();
+  const fetchDrugs = async () => {
     const tx = db.transaction(DRUG_STORE, 'readonly');
     const store = tx.objectStore(DRUG_STORE);
-    const request = store.openCursor();
-    const found: DrugTemplate[] = [];
-    request.onsuccess = (e) => {
-      const cursor = (e.target as any).result;
-      if (cursor && found.length < 50) {
-        const drug = cursor.value as DrugTemplate;
-        if (!q || drug.name.toLowerCase().includes(q)) found.push(drug);
-        cursor.continue();
-      } else {
-        setResults(found);
-      }
-    };
+    const request = store.getAll();
+    request.onsuccess = () => setDrugs(request.result);
   };
 
-  useEffect(() => { loadDrugs(); }, [search, db]);
+  useEffect(() => { fetchDrugs(); }, [db]);
 
-  const handleAdd = () => {
-    if (!newDrug.name) return;
-    const drug: DrugTemplate = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: newDrug.name,
-      defaultStrength: newDrug.strength,
-      defaultInstructions: newDrug.instructions,
-      category: newDrug.category || 'User Added'
-    };
+  const saveDrug = async () => {
+    if (!editing?.name) return;
+    const drugToSave = {
+      ...editing,
+      id: editing.id || Math.random().toString(36).substr(2, 9),
+      defaultStrength: editing.defaultStrength || '500mg',
+      defaultInstructions: editing.defaultInstructions || 'روزانه یک عدد'
+    } as DrugTemplate;
+    
     const tx = db.transaction(DRUG_STORE, 'readwrite');
-    tx.objectStore(DRUG_STORE).add(drug);
+    tx.objectStore(DRUG_STORE).put(drugToSave);
     tx.oncomplete = () => {
-      setNewDrug({ name: '', strength: '', instructions: '', category: '' });
-      loadDrugs();
+      setEditing(null);
+      fetchDrugs();
     };
   };
 
-  const handleDelete = (id: string) => {
+  const deleteDrug = async (id: string) => {
+    if (!confirm('آیا مطمئن هستید؟')) return;
     const tx = db.transaction(DRUG_STORE, 'readwrite');
     tx.objectStore(DRUG_STORE).delete(id);
-    tx.oncomplete = () => loadDrugs();
+    tx.oncomplete = () => fetchDrugs();
   };
 
-  return (
-    <div className="space-y-6 fade-in text-right">
-      <div className="bg-white p-6 rounded-[2rem] shadow-sm space-y-4">
-        <h3 className="font-bold text-gray-800 border-r-4 border-indigo-600 pr-3">افزودن دوای جدید</h3>
-        <input className="w-full p-4 bg-gray-50 rounded-2xl border-none text-right outline-none" placeholder="نام دوا" value={newDrug.name} onChange={e => setNewDrug({...newDrug, name: e.target.value})} />
-        <div className="grid grid-cols-2 gap-3">
-          <input className="w-full p-4 bg-gray-50 rounded-2xl border-none text-right outline-none" placeholder="دوز پیش‌فرض" value={newDrug.strength} onChange={e => setNewDrug({...newDrug, strength: e.target.value})} />
-          <input className="w-full p-4 bg-gray-50 rounded-2xl border-none text-right outline-none" placeholder="کتگوری" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
-        </div>
-        <button onClick={handleAdd} className="w-full bg-indigo-700 text-white p-4 rounded-2xl font-bold">ذخیره در بانک</button>
-      </div>
+  const filtered = drugs.filter(d => d.name.toLowerCase().includes(search.toLowerCase()) || d.brandNames?.toLowerCase().includes(search.toLowerCase()));
 
+  return (
+    <div className="space-y-4 fade-in">
+      <div className="flex justify-between items-center bg-white p-5 rounded-[2rem] shadow-sm">
+        <button onClick={() => setEditing({})} className="bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100">افزودن دوای جدید</button>
+        <h2 className="font-bold text-indigo-900">مدیریت بانک دواها</h2>
+      </div>
       <div className="relative">
         <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-        <input className="w-full bg-white border border-gray-100 p-4 pr-12 rounded-2xl text-right outline-none" placeholder="جستجوی دوا..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="w-full bg-white border border-gray-100 rounded-2xl py-4 pr-12 pl-4 outline-none focus:ring-2 focus:ring-indigo-500 text-right font-bold text-sm shadow-sm" placeholder="جستجو در لیست..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
-
-      <div className="space-y-2">
-        {results.map(t => (
-          <div key={t.id} className="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center text-right shadow-sm">
-            <button onClick={() => handleDelete(t.id)} className="text-red-200 hover:text-red-500 transition-colors"><Trash2 className="w-5 h-5" /></button>
-            <div className="flex-1">
-              <div className="font-bold text-gray-800">{t.name}</div>
-              <div className="text-[10px] text-gray-400 italic">{t.defaultStrength} — {t.category}</div>
+      <div className="space-y-3">
+        {filtered.map(d => (
+          <div key={d.id} className="bg-white p-5 rounded-2xl flex justify-between items-center shadow-sm border border-gray-50 group">
+            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+              <button onClick={() => deleteDrug(d.id)} className="p-2 text-red-100 bg-red-600 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+              <button onClick={() => setEditing(d)} className="p-2 text-indigo-100 bg-indigo-700 rounded-lg"><Edit3 className="w-4 h-4" /></button>
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-gray-800 ltr">{d.name}</div>
+              <div className="text-[10px] text-gray-400 font-bold">{d.brandNames || 'بدون برند'} | {d.category || 'عمومی'}</div>
             </div>
           </div>
         ))}
       </div>
+
+      {editing && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] p-6 flex items-center justify-center">
+          <div className="w-full max-sm:max-w-xs max-w-sm bg-white rounded-[2.5rem] p-8 space-y-4 shadow-2xl scale-in text-right">
+            <h3 className="font-bold text-indigo-900 border-r-4 border-indigo-600 pr-3">{editing.id ? 'ویرایش دوا' : 'ثبت دوای جدید'}</h3>
+            <div className="space-y-3">
+              <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 pr-2">نام جنریک (Generic Name)</label><input className="w-full p-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-right outline-none ltr" value={editing.name || ''} onChange={e => setEditing({...editing, name: e.target.value})} /></div>
+              <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 pr-2">برندها (Brand Names)</label><input className="w-full p-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-right outline-none ltr" value={editing.brandNames || ''} onChange={e => setEditing({...editing, brandNames: e.target.value})} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 pr-2">دوز (Strength)</label><input className="w-full p-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-right outline-none ltr" value={editing.defaultStrength || ''} onChange={e => setEditing({...editing, defaultStrength: e.target.value})} /></div>
+                <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 pr-2">کتگوری</label><input className="w-full p-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-right outline-none" value={editing.category || ''} onChange={e => setEditing({...editing, category: e.target.value})} /></div>
+              </div>
+              <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 pr-2">رهنمود پیش‌فرض (Instructions)</label><input className="w-full p-3.5 bg-gray-50 border-none rounded-xl text-sm font-bold text-right outline-none" value={editing.defaultInstructions || ''} onChange={e => setEditing({...editing, defaultInstructions: e.target.value})} /></div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <button onClick={saveDrug} className="flex-[2] bg-indigo-700 text-white p-4 rounded-xl font-bold shadow-lg shadow-indigo-100 active:scale-95 transition-all">ذخیره دوا</button>
+              <button onClick={() => setEditing(null)} className="flex-1 bg-gray-100 text-gray-500 p-4 rounded-xl font-bold active:scale-95 transition-all">لغو</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 const ClinicSettingsForm = ({ settings, onSave, storedPin, onSavePin, onBack }: any) => {
-  const [data, setData] = useState(settings);
-  const [newPin, setNewPin] = useState('');
-  const [currentPinCheck, setCurrentPinCheck] = useState('');
+  const [data, setData] = useState<ClinicSettings>(settings);
+  const [pin, setPin] = useState(storedPin);
 
-  const handlePinUpdate = () => {
-    if (currentPinCheck !== storedPin) {
-      alert('رمز فعلی اشتباه است.');
-      return;
-    }
-    onSavePin(newPin);
-    alert('رمز عبور تغییر یافت.');
-    setNewPin('');
-    setCurrentPinCheck('');
+  const handleSave = () => {
+    onSave(data);
+    onSavePin(pin);
+    alert('تنظیمات با موفقیت ذخیره شد!');
   };
 
   return (
-    <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl space-y-6 text-right fade-in">
-      <h2 className="text-2xl font-black text-gray-800">تنظیمات کلینیک</h2>
-      <div className="space-y-4">
-        <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400">نام شفاخانه / کلینیک</label><input className="w-full p-4 bg-gray-50 rounded-2xl border-none text-right outline-none shadow-inner" value={data.name} onChange={e => setData({...data, name: e.target.value})} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400">نام داکتر</label><input className="w-full p-4 bg-gray-50 rounded-2xl border-none text-right outline-none shadow-inner" value={data.doctor} onChange={e => setData({...data, doctor: e.target.value})} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400">آدرس</label><textarea className="w-full p-4 bg-gray-50 rounded-2xl border-none text-right outline-none shadow-inner min-h-[80px]" value={data.address} onChange={e => setData({...data, address: e.target.value})} /></div>
-        <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400">نمبر تماس</label><input className="w-full p-4 bg-gray-50 rounded-2xl border-none text-right outline-none shadow-inner" value={data.phone} onChange={e => setData({...data, phone: e.target.value})} /></div>
+    <div className="space-y-6 fade-in text-right">
+      <div className="flex justify-between items-center bg-white p-5 rounded-[2rem] shadow-sm">
+        <button onClick={onBack} className="p-2 bg-gray-100 rounded-full"><ChevronLeft className="w-5 h-5 text-gray-600" /></button>
+        <h2 className="font-bold text-indigo-900">تنظیمات شفاخانه و داکتر</h2>
       </div>
-      
-      <div className="pt-8 border-t border-gray-100 space-y-4">
-        <h3 className="font-bold text-gray-800 flex items-center gap-2 flex-row-reverse">تغییر رمز عبور ورود <Key className="w-4 h-4" /></h3>
-        <div className="grid grid-cols-2 gap-3">
-          <input className="w-full p-4 bg-gray-50 rounded-2xl border-none text-center outline-none" type="password" placeholder="رمز فعلی" value={currentPinCheck} onChange={e => setCurrentPinCheck(e.target.value)} />
-          <input className="w-full p-4 bg-gray-50 rounded-2xl border-none text-center outline-none" type="password" placeholder="رمز جدید" value={newPin} onChange={e => setNewPin(e.target.value)} />
+
+      <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm space-y-6">
+        <h3 className="text-sm font-bold text-indigo-700 border-r-4 border-indigo-600 pr-3">اطلاعات سرورقی و پای‌ورقی</h3>
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 pr-2">نام شفاخانه / کلینیک</label>
+            <input className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none" value={data.name} onChange={e => setData({...data, name: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 pr-2">نام داکتر</label>
+            <input className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none" value={data.doctor} onChange={e => setData({...data, doctor: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 pr-2">تخصص داکتر</label>
+            <input className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none" value={data.specialty} onChange={e => setData({...data, specialty: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 pr-2">شعار / متن انگلیسی (Tagline)</label>
+            <input className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none ltr" value={data.tagline} onChange={e => setData({...data, tagline: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 pr-2">آدرس (پای‌ورقی)</label>
+            <input className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none" value={data.address} onChange={e => setData({...data, address: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 pr-2">شماره‌های تماس (پای‌ورقی)</label>
+            <input className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none" value={data.phone} onChange={e => setData({...data, phone: e.target.value})} />
+          </div>
         </div>
-        <button onClick={handlePinUpdate} className="w-full bg-slate-900 text-white p-4 rounded-2xl font-bold">ثبت رمز جدید</button>
+
+        <h3 className="text-sm font-bold text-red-700 border-r-4 border-red-600 pr-3 pt-4">امنیت سیستم</h3>
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold text-gray-400 pr-2">رمز عبور داکتر (PIN)</label>
+          <div className="relative">
+            <Key className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 w-5 h-5" />
+            <input type="password" className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-red-500 pr-12 outline-none" value={pin} onChange={e => setPin(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="pt-6">
+          <button onClick={handleSave} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all"><Save className="w-6 h-6" /> ذخیره تمامی تغییرات</button>
+        </div>
       </div>
-      
-      <button onClick={() => { onSave(data); onBack(); }} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold shadow-xl active:scale-95 transition-transform">ذخیره نهایی تنظیمات</button>
+    </div>
+  );
+};
+
+const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack, onEdit }: any) => {
+  const printRef = useRef<HTMLDivElement>(null);
+  const [isPrePrinted, setIsPrePrinted] = useState(false);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="space-y-6 fade-in pb-20 no-print">
+      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-5 rounded-[2rem] shadow-sm no-print gap-4">
+        <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-2xl">
+          <button 
+            onClick={() => setIsPrePrinted(false)} 
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${!isPrePrinted ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-400'}`}
+          >
+            <FileText className="w-4 h-4" /> نسخه کامل
+          </button>
+          <button 
+            onClick={() => setIsPrePrinted(true)} 
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${isPrePrinted ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-400'}`}
+          >
+            <File className="w-4 h-4" /> چاپ روی سرنسخه
+          </button>
+        </div>
+        <div className="flex gap-2">
+           <button onClick={onEdit} className="p-3 bg-gray-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all"><Edit3 className="w-5 h-5" /></button>
+           <button onClick={handlePrint} className="p-3 bg-indigo-700 text-white rounded-2xl shadow-lg shadow-indigo-100 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 px-5">
+             <Printer className="w-5 h-5" /> 
+             <span className="text-xs font-bold">چاپ نسخه</span>
+           </button>
+           <button onClick={onBack} className="p-3 bg-gray-100 rounded-2xl"><X className="w-5 h-5 text-gray-500" /></button>
+        </div>
+      </div>
+
+      <div className="rx-preview-container overflow-x-auto">
+        <div ref={printRef} className={`print-area ${isPrePrinted ? 'pre-printed-mode' : ''}`}>
+          <div className="rx-header">
+             <div className="text-right">
+                <h1 className="text-2xl font-black mb-1">{settings.name}</h1>
+                <p className="text-sm font-bold text-blue-100">{settings.doctor}</p>
+                <p className="text-[10px] opacity-80">{settings.specialty}</p>
+             </div>
+             <div className="text-center">
+                <div className="bg-white/20 p-4 rounded-3xl mb-1"><Stethoscope className="w-12 h-12 text-white" /></div>
+                <p className="text-[9px] font-black tracking-[3px] opacity-60 uppercase ltr">{settings.tagline}</p>
+             </div>
+          </div>
+
+          <div className="patient-info-bar">
+             <div className="ltr">NAME: {patient.name}</div>
+             <div>AGE: {patient.age} Yrs</div>
+             <div>SEX: {patient.gender === 'male' ? 'M' : 'F'}</div>
+             <div className="ltr">DATE: {new Date(prescription.date).toLocaleDateString('en-GB')}</div>
+          </div>
+
+          <div className="rx-body">
+             {/* سایدبار در سمت چپ نسخه قرار می‌گیرد */}
+             <div className="rx-sidebar">
+                <div>
+                   <div className="sidebar-section-title">Clinical Record</div>
+                   <div className="space-y-1.5 pt-2">
+                      <div className="vitals-row"><span>BP:</span> <b>{prescription.clinicalRecords.bp}</b></div>
+                      <div className="vitals-row"><span>PR:</span> <b>{prescription.clinicalRecords.pr}</b></div>
+                      <div className="vitals-row"><span>T°:</span> <b>{prescription.clinicalRecords.temp}</b></div>
+                      <div className="vitals-row"><span>Wt:</span> <b>{prescription.clinicalRecords.wt}</b></div>
+                   </div>
+                </div>
+
+                {prescription.cc && (
+                <div>
+                   <div className="sidebar-section-title">Chief Complaint</div>
+                   <div className="text-[10px] font-bold pt-1 leading-relaxed ltr">{prescription.cc}</div>
+                </div>
+                )}
+
+                <div>
+                   <div className="sidebar-section-title">Diagnosis</div>
+                   <div className="text-[10px] font-bold pt-1 leading-relaxed ltr">{prescription.diagnosis}</div>
+                </div>
+
+                <div>
+                   <div className="sidebar-section-title">Instructions</div>
+                   <div className="text-[9px] font-bold italic opacity-60 ltr">Follow up in 1 week.</div>
+                </div>
+             </div>
+
+             {/* محتوای اصلی با لیست داروها در سمت راست سایدبار */}
+             <div className="rx-main-content">
+                <span className="rx-symbol-large">Rx</span>
+                <div className="meds-list mt-8">
+                   {prescription.medications.map((m: any, idx: number) => (
+                      <div key={idx} className="med-item ltr">
+                         <div className="flex-1">
+                            <div className="text-[12pt] font-black">{idx + 1}. {m.name} {m.strength}</div>
+                            <div className="text-[10pt] font-bold text-gray-600 mt-1 pl-4 italic opacity-80">-- {m.instructions}</div>
+                         </div>
+                      </div>
+                   ))}
+                </div>
+             </div>
+          </div>
+
+          <div className="rx-footer">
+             <div className="doctor-stamp-area">
+                <div className="w-32 h-16 border-2 border-dashed border-gray-200 mx-auto mb-1 flex items-center justify-center text-[8px] text-gray-300">Doctor's Stamp & Signature</div>
+                <div className="font-bold text-[10pt]">{settings.doctor}</div>
+             </div>
+             <div className="text-right">
+                <div className="font-bold text-blue-900 mb-1">{settings.name}</div>
+                <div className="opacity-70 text-[8pt]">{settings.address}</div>
+                <div className="font-black text-[9pt] mt-1">{settings.phone}</div>
+             </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

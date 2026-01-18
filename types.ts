@@ -55,6 +55,21 @@ export interface DiagnosisTemplate {
   category: string;
 }
 
+export interface PrintLayoutSettings {
+  pageSize: 'A4' | 'A5';
+  showPatientName: boolean;
+  showAge: boolean;
+  showWeight: boolean;
+  showDate: boolean;
+  showBP: boolean;
+  showPulse: boolean;
+  showResp: boolean;
+  showTemp: boolean;
+  showDiagnosis: boolean;
+  showDrugList: boolean;
+  headerImage?: string; 
+}
+
 export interface ClinicSettings {
   name: string;
   doctor: string;
@@ -62,6 +77,7 @@ export interface ClinicSettings {
   address: string;
   phone: string;
   tagline: string;
+  printLayout: PrintLayoutSettings;
 }
 
 export type ViewState = 'HOME' | 'PATIENTS' | 'NEW_PATIENT' | 'NEW_PRESCRIPTION' | 'PRESCRIPTION_HISTORY' | 'DRUGS' | 'VIEW_PDF' | 'SETTINGS';

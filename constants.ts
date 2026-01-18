@@ -84,5 +84,18 @@ export const DEFAULT_CLINIC_SETTINGS: ClinicSettings = {
   specialty: 'متخصص امراض داخله عمومی و جراحی',
   address: 'کابل، چهارراهی صدارت، کابل - افغانستان',
   phone: '۰۷۸۸۸۸۸۸۸۸ / ۰۷۹۹۹۹۹۹۹۹',
-  tagline: 'تداوی با استندردهای جهانی و مراقبت‌های ویژه'
+  tagline: 'تداوی با استندردهای جهانی و مراقبت‌های ویژه',
+  printLayout: {
+    pageSize: 'A4',
+    showPatientName: true,
+    showAge: true,
+    showWeight: true,
+    showDate: true,
+    showBP: true,
+    showPulse: true,
+    showResp: true,
+    showTemp: true,
+    showDiagnosis: true,
+    showDrugList: true,
+  }
 };
