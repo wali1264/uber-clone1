@@ -111,7 +111,6 @@ const App: React.FC = () => {
                 const stem = stems[i % stems.length];
                 const suffix = suffixes[i % suffixes.length];
                 
-                // ایجاد نام کاملاً منحصربه‌فرد برای اطمینان از وجود ۵۰۰,۰۰۰ نوع مختلف
                 storeBatch.put({
                   id: `gen-${i}`,
                   name: `${form}${stem}${suffix}-${i}`,
@@ -293,15 +292,16 @@ const NavBtn = ({ icon, label, onClick }: any) => (
 );
 
 const PatientForm = ({ onSubmit, onCancel }: any) => {
-  const [d, setD] = useState({ name: '', age: '', gender: 'male' });
+  const [d, setD] = useState({ name: '', phone: '', age: '', gender: 'male' });
   return (
     <div className="bg-white p-8 rounded-[2.5rem] shadow-sm space-y-5 text-right fade-in">
       <h2 className="text-xl font-bold text-indigo-900 border-b pb-4">ثبت مریض جدید</h2>
       <div className="space-y-4 pt-2">
-        <input className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white outline-none transition-all" placeholder="Name" value={d.name} onChange={e => setD({...d, name: e.target.value})} />
-        <input className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white outline-none transition-all" placeholder="Age" type="number" value={d.age} onChange={e => setD({...d, age: e.target.value})} />
+        <input className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white outline-none transition-all" placeholder="نام مریض" value={d.name} onChange={e => setD({...d, name: e.target.value})} />
+        <input className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white outline-none transition-all" placeholder="شماره تلیفون" type="tel" value={d.phone} onChange={e => setD({...d, phone: e.target.value})} />
+        <input className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white outline-none transition-all" placeholder="سن" type="number" value={d.age} onChange={e => setD({...d, age: e.target.value})} />
         <select className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none transition-all" value={d.gender} onChange={e => setD({...d, gender: e.target.value})}>
-          <option value="male">Male</option><option value="female">Female</option>
+          <option value="male">مذکر</option><option value="female">مونث</option>
         </select>
       </div>
       <div className="flex gap-3 pt-6">
@@ -329,11 +329,9 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
     const results: any[] = [];
     const searchLower = search.toLowerCase();
     
-    // استفاده از کرسر برای جستجوی پویا در تمام ۵۰۰,۰۰۰ رکورد
-    // در صورت وجود متن جستجو، کرسر فقط رکوردهایی که شامل آن هستند را انتخاب می‌کند
     nameIndex.openCursor().onsuccess = (e: any) => {
       const cursor = e.target.result;
-      if (cursor && results.length < 50) { // نمایش ۵۰ نتیجه اول برای سرعت بالاتر
+      if (cursor && results.length < 50) { 
         const drugName = cursor.value.name.toLowerCase();
         if (!search || drugName.includes(searchLower)) {
           results.push(cursor.value);
@@ -371,7 +369,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
     <div className="space-y-6 pb-12 fade-in">
       <div className="bg-slate-900 p-6 rounded-[2rem] text-white text-right shadow-xl">
         <div className="font-bold text-xl">{patient.name}</div>
-        <div className="text-xs text-indigo-400 mt-1 uppercase tracking-wider">Age: {patient.age} | Code: {patient.code}</div>
+        <div className="text-xs text-indigo-400 mt-1 uppercase tracking-wider">سن: {patient.age} | کود: {patient.code}</div>
       </div>
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm grid grid-cols-3 gap-2 border border-gray-100">
