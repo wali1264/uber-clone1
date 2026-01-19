@@ -16,202 +16,95 @@
       .fade-in { animation: fadeIn 0.3s ease-in-out; }
       @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       
-      .rx-preview-container {
-        display: flex;
-        justify-content: center;
-        padding: 40px 20px;
-        background: #e2e8f0;
-        min-height: calc(100vh - 120px);
-      }
-
-      /* Royal Style - Updated for Header support */
-      .print-area {
+      /* حالت عادی (عیناً طبق درخواست کاربر) */
+      #print-area {
         width: 210mm;
-        height: 297mm;
+        min-height: 297mm;
+        padding: 20mm;
+        background: #fff;
+        color: #000;
+        font-size: 14px;
         margin: auto;
-        background: white;
-        color: black;
-        font-family: Arial, sans-serif;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        display: flex;
-        flex-direction: column; /* Vertical stack: Header then Body then Footer */
-        overflow: hidden;
-        position: relative;
+        box-sizing: border-box;
       }
 
-      /* Header Section */
+      /* تنظیمات مخصوص چاپ (عیناً طبق درخواست کاربر) */
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+
+        #print-area, #print-area * {
+          visibility: visible;
+        }
+
+        #print-area {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 210mm;
+          min-height: 297mm;
+          margin: 0;
+          padding: 20mm;
+        }
+
+        @page {
+          size: A4;
+          margin: 0;
+        }
+      }
+
+      /* استایل‌های تکمیلی برای ساختار داخلی نسخه */
       .rx-header {
         width: 100%;
-        padding: 10mm 15mm;
-        border-bottom: 2px solid #1e293b;
+        border-bottom: 2px solid #000;
+        padding-bottom: 5mm;
+        margin-bottom: 5mm;
         text-align: center;
-        display: flex;
-        flex-direction: column;
-        gap: 2mm;
       }
-
       .rx-body {
         display: flex;
-        flex-direction: row-reverse; /* Sidebar on the right */
+        flex-direction: row-reverse;
         flex: 1;
+        min-height: 180mm;
       }
-
-      /* Sidebar (Right) */
       .rx-sidebar {
-        width: 25%;
-        background: #f1f5f9;
-        padding: 8mm 4mm;
+        width: 30%;
+        border-left: 1px solid #000;
+        padding: 0 5mm;
         display: flex;
         flex-direction: column;
-        gap: 6mm;
-        border-left: 1px solid #e2e8f0;
+        gap: 5mm;
       }
-
-      .sidebar-title {
-        font-size: 13pt;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 4mm;
-        color: #1e293b;
-      }
-
-      .sidebar-section {
-        display: flex;
-        flex-direction: column;
-        gap: 1.5mm;
-      }
-
-      .sidebar-label {
-        font-size: 7.5pt;
-        font-weight: bold;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        text-align: right;
-      }
-
-      .sidebar-value {
-        font-size: 10pt;
-        font-weight: bold;
-        text-align: right;
-        margin-bottom: 1.5mm;
-        color: #0f172a;
-      }
-
-      /* Vitals Grid in Sidebar - Vertical Layout */
-      .vitals-grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 2mm;
-        margin-top: 1mm;
-      }
-
-      .vital-box {
-        background: white;
-        border: 1px solid #e2e8f0;
-        padding: 2mm;
-        border-radius: 1mm;
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .vital-box label {
-        font-size: 7pt;
-        font-weight: bold;
-        color: #94a3b8;
-        text-transform: uppercase;
-      }
-
-      .vital-box span {
-        font-size: 9pt;
-        font-weight: bold;
-        color: #1e293b;
-      }
-
-      /* Main Content (Left) */
       .rx-main {
-        width: 75%;
-        padding: 10mm 15mm;
+        width: 70%;
+        padding: 0 5mm;
         display: flex;
         flex-direction: column;
         position: relative;
-        background: white;
       }
-
-      .main-top-left {
-        position: absolute;
-        top: 10mm;
-        left: 12mm;
-        font-size: 7pt;
-        font-weight: bold;
-        color: #94a3b8;
-      }
-
-      .rx-symbol-container {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: 2mm;
-      }
-
       .rx-symbol-large {
-        font-size: 52pt;
-        font-family: "Times New Roman", serif;
+        font-size: 40pt;
+        font-family: serif;
         font-weight: bold;
         font-style: italic;
-        color: #0f172a;
       }
-
-      .meds-container {
-        margin-top: 15mm;
-        flex: 1;
+      .meds-list {
+        margin-top: 5mm;
+        list-style: none;
+        padding: 0;
         direction: ltr;
         text-align: left;
       }
-
       .med-item {
-        margin-bottom: 6mm;
+        margin-bottom: 4mm;
       }
-      .med-name {
-        font-size: 12pt;
-        font-weight: bold;
-        color: #1e293b;
-      }
-      .med-instruction {
-        font-size: 10pt;
-        color: #64748b;
-        margin-left: 6mm;
-        margin-top: 1mm;
-        font-style: italic;
-      }
-
-      .signature-area {
-        position: absolute;
-        bottom: 15mm;
-        left: 12mm;
-        border-top: 1px solid #cbd5e1;
-        padding-top: 2mm;
-        width: 45mm;
-        text-align: left;
-        font-size: 7.5pt;
-        font-weight: bold;
-        color: #94a3b8;
-        letter-spacing: 0.5px;
-      }
-
-      /* Footer Section */
       .rx-footer {
         width: 100%;
-        padding: 8mm 15mm;
-        border-top: 2px solid #1e293b;
+        border-top: 2px solid #000;
+        padding-top: 5mm;
+        margin-top: auto;
         text-align: center;
-        display: flex;
-        flex-direction: column;
-        gap: 1mm;
-        background: white;
-        font-size: 10pt;
-        color: #1e293b;
         font-weight: bold;
       }
 
@@ -219,50 +112,27 @@
       .preview-modal-overlay {
         position: fixed;
         inset: 0;
-        background: white;
+        background: #e2e8f0;
         z-index: 1000;
         display: flex;
         flex-direction: column;
+        overflow-y: auto;
       }
-      
-      .preview-header {
-        height: 56px;
+      .preview-header-ui {
         background: white;
-        border-bottom: 1px solid #e2e8f0;
+        padding: 1rem;
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        padding: 0 16px;
-      }
-
-      .preview-footer {
-        height: 72px;
-        background: white;
-        border-top: 1px solid #e2e8f0;
-        display: flex;
         align-items: center;
-        justify-content: flex-start;
-        padding: 0 24px;
-        gap: 12px;
+        border-bottom: 1px solid #cbd5e1;
+        position: sticky;
+        top: 0;
+        z-index: 1001;
       }
-
-      @media print {
-        body * { visibility: hidden !important; }
-        .print-area, .print-area * { visibility: visible !important; }
-        .print-area {
-          position: fixed !important;
-          left: 0 !important;
-          top: 0 !important;
-          width: 210mm !important;
-          height: 297mm !important;
-          box-shadow: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-        .preview-modal-overlay, .no-print { display: none !important; }
-        @page { size: A4; margin: 0; }
+      .preview-content {
+        padding: 2rem;
+        display: flex;
+        justify-content: center;
       }
     </style>
     <script type="importmap">
