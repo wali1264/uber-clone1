@@ -77,6 +77,7 @@ export interface ClinicSettings {
   address: string;
   phone: string;
   tagline: string;
+  language: 'fa' | 'ps' | 'en';
   printLayout: PrintLayoutSettings;
 }
 

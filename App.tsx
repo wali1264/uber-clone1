@@ -67,7 +67,7 @@ const MEDICAL_DIAGNOSES = [
   { cat: 'Respiratory', items: ['Acute Bronchitis', 'Community Acquired Pneumonia', 'COPD Exacerbation', 'Bronchial Asthma', 'Viral URTI', 'Pulmonary Tuberculosis', 'Acute Tonsillopharyngitis', 'Sinusitis', 'Bronchiectasis'] },
   { cat: 'Gastrointestinal', items: ['Acute Gastritis', 'Peptic Ulcer Disease', 'GERD', 'Acute Gastroenteritis', 'Irritable Bowel Syndrome', 'H. Pylori Infection', 'Bacillary Dysentery', 'Amoebic Colitis', 'Acute Cholecystitis', 'Hepatitis'] },
   { cat: 'Cardiovascular', items: ['Essential Hypertension', 'Ischemic Heart Disease', 'Congestive Heart Failure', 'Atrial Fibrillation', 'Deep Vein Thrombosis', 'Valvular Heart Disease'] },
-  { cat: 'Endocrine', items: ['Diabetes Mellitus Type 2', 'Diabetes Mellitus Type 1', 'Hypothyroidism', 'Hyperthyroidism', 'Dyslipidemia', 'Vitamin D Deficiency', 'Polycystic Ovary Syndrome'] },
+  { cat: 'Endocrine', items: ['Diabetes Mellitus Type 2', 'Diabetes Mellitus Type 1', 'Hypothyroidism', 'Hyperthyroidism', 'Dyslipidemia', 'Vitamin D Deficiency', 'Polycystyic Ovary Syndrome'] },
   { cat: 'Infectious', items: ['Enteric Fever (Typhoid)', 'Malaria (Falciparum)', 'Malaria (Vivax)', 'Urinary Tract Infection', 'Acute Pyelonephritis', 'Sepsis', 'Meningitis', 'Brucellosis'] },
   { cat: 'Neurological', items: ['Migraine', 'Tension Headache', 'Ischemic Stroke', 'Transient Ischemic Attack', 'Epilepsy', 'Peripheral Neuropathy', 'BPPV / Vertigo'] },
   { cat: 'Orthopedic', items: ['Osteoarthritis', 'Rheumatoid Arthritis', 'Lumbar Radiculopathy', 'Cervical Spondylosis', 'Osteoporosis', 'Fibromyalgia', 'Gouty arthritis'] },
@@ -118,6 +118,7 @@ const App: React.FC = () => {
       if (savedSettings) {
         const settings = JSON.parse(savedSettings);
         if (!settings.printLayout) settings.printLayout = DEFAULT_CLINIC_SETTINGS.printLayout;
+        if (!settings.language) settings.language = DEFAULT_CLINIC_SETTINGS.language;
         setClinicSettings(settings);
       }
       if (savedPin) setStoredPin(savedPin);
@@ -639,6 +640,14 @@ const ClinicSettingsForm = ({ settings, onSave, storedPin, onSavePin, onBack }: 
             <label className="text-[10px] font-bold text-gray-400 pr-2">شماره‌های تماس (پای‌ورقی)</label>
             <input className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none" value={data.phone} onChange={e => setData({...data, phone: e.target.value})} />
           </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 pr-2">زبان سیستم</label>
+            <select className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm font-bold outline-none" value={data.language} onChange={e => setData({...data, language: e.target.value as any})}>
+              <option value="fa">دری / فارسی</option>
+              <option value="ps">پشتو</option>
+              <option value="en">English</option>
+            </select>
+          </div>
         </div>
 
         <h3 className="text-sm font-bold text-red-700 border-r-4 border-red-600 pr-3 pt-4">امنیت سیستم</h3>
@@ -666,113 +675,170 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack, onEd
     window.print();
   };
 
+  const handleFullPreview = () => {
+    const printContent = printRef.current?.innerHTML;
+    const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map(style => style.outerHTML)
+      .join('\n');
+    
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(`
+        <html lang="fa" dir="rtl">
+          <head>
+            <meta charset="UTF-8">
+            <title>پیش‌نمایش نسخه - ${patient.name}</title>
+            ${styles}
+            <style>
+              body { 
+                background: #f1f5f9; 
+                margin: 0; 
+                padding: 40px; 
+                display: flex; 
+                flex-direction: column; 
+                align-items: center; 
+                min-height: 100vh;
+              }
+              .print-area { 
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); 
+                background: white;
+                margin-bottom: 40px;
+              }
+              @media print {
+                body { background: white; padding: 0; }
+                .print-area { box-shadow: none; margin: 0; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="print-area ${isPrePrinted ? 'pre-printed-mode' : ''}">
+              ${printContent}
+            </div>
+          </body>
+        </html>
+      `);
+      win.document.close();
+    }
+  };
+
   return (
-    <div className="space-y-6 fade-in pb-20 no-print">
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-white p-5 rounded-[2rem] shadow-sm no-print gap-4">
-        <div className="flex items-center gap-3 bg-gray-50 p-1.5 rounded-2xl">
-          <button 
-            onClick={() => setIsPrePrinted(false)} 
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${!isPrePrinted ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-400'}`}
-          >
-            <FileText className="w-4 h-4" /> نسخه کامل
-          </button>
-          <button 
-            onClick={() => setIsPrePrinted(true)} 
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${isPrePrinted ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-400'}`}
-          >
-            <File className="w-4 h-4" /> چاپ روی سرنسخه
-          </button>
+    <div className="preview-modal-overlay no-print">
+      {/* Top UI Header */}
+      <div className="preview-header">
+         <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <X className="w-6 h-6 text-gray-400" />
+         </button>
+         <span className="font-bold text-gray-800">پیش‌نمایش چاپ</span>
+      </div>
+
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main Sheet Container */}
+        <div className="flex-1 overflow-y-auto bg-[#e2e8f0] p-8 rx-preview-container scrollbar-hide">
+          <div ref={printRef} className={`print-area ${isPrePrinted ? 'pre-printed-mode' : ''}`}>
+            {/* Header Area updated to include Patient Info under Doctor name */}
+            <div className="rx-header">
+              <div className="text-2xl font-bold text-slate-800 tracking-tight">{settings.name}</div>
+              <div className="text-lg font-bold text-slate-600">{settings.doctor}</div>
+              <div className="text-xs text-slate-400 italic mb-2">{settings.specialty}</div>
+              
+              {/* Patient details row in the header - Updated labels and date format to English */}
+              <div className="flex justify-between gap-6 text-[10pt] border-t border-slate-100 pt-2 mt-1 px-4 ltr">
+                <div><span className="font-bold text-slate-500 mr-1">Date:</span> {new Date(prescription.date).toLocaleDateString('en-GB')}</div>
+                <div><span className="font-bold text-slate-500 mr-1">Gender:</span> {patient.gender === 'male' ? 'Male' : 'Female'}</div>
+                <div><span className="font-bold text-slate-500 mr-1">Age:</span> {patient.age}</div>
+                <div><span className="font-bold text-slate-500 mr-1">Patient Name:</span> {patient.name}</div>
+              </div>
+            </div>
+
+            <div className="rx-body">
+              {/* Sidebar (Right side in sheet) */}
+              <div className="rx-sidebar">
+                <div className="sidebar-title">اطلاعات جنبی</div>
+                
+                <div className="sidebar-section">
+                    <div className="sidebar-label">PATIENT CODE</div>
+                    <div className="sidebar-value">{patient.code}</div>
+                </div>
+
+                {/* V.S moved to top of the detailed sidebar info */}
+                <div className="sidebar-section mt-4">
+                    <div className="sidebar-label">VITALS (V.S)</div>
+                    <div className="vitals-grid">
+                      <div className="vital-box"><label>BP</label><span>{prescription.clinicalRecords.bp || '-'}</span></div>
+                      <div className="vital-box"><label>HR</label><span>{prescription.clinicalRecords.hr || '-'}</span></div>
+                      <div className="vital-box"><label>PR</label><span>{prescription.clinicalRecords.pr || '-'}</span></div>
+                      <div className="vital-box"><label>SPO2</label><span>{prescription.clinicalRecords.spo2 || '-'}</span></div>
+                      <div className="vital-box"><label>TEMP</label><span>{prescription.clinicalRecords.temp || '-'}</span></div>
+                      <div className="vital-box"><label>WT</label><span>{prescription.clinicalRecords.wt || '-'}</span></div>
+                    </div>
+                </div>
+
+                {/* CC Section below V.S */}
+                <div className="sidebar-section mt-4">
+                    <div className="sidebar-label">C/C</div>
+                    <div className="sidebar-value text-[9pt] leading-tight text-right">{prescription.cc || '-'}</div>
+                </div>
+
+                {/* Diagnosis Section below V.S and C/C */}
+                <div className="sidebar-section mt-4">
+                    <div className="sidebar-label">DIAGNOSIS</div>
+                    <div className="sidebar-value text-[9pt] leading-tight text-right">{prescription.diagnosis || '-'}</div>
+                </div>
+              </div>
+
+              {/* Main Content (Left side in sheet) */}
+              <div className="rx-main">
+                <div className="main-top-left">:N.M.C</div>
+
+                <div className="rx-symbol-container">
+                    <span className="rx-symbol-large">Rx</span>
+                </div>
+
+                <div className="meds-container">
+                    {prescription.medications.map((m: any, idx: number) => (
+                      <div key={idx} className="med-item">
+                          <div className="med-name">{idx + 1}. {m.name} {m.strength}</div>
+                          <div className="med-instruction">-- {m.instructions}</div>
+                      </div>
+                    ))}
+                </div>
+
+                <div className="signature-area">
+                    DOCTOR'S SIGNATURE
+                </div>
+              </div>
+            </div>
+
+            {/* Footer added to display clinic address and phones */}
+            <div className="rx-footer">
+              <div>{settings.address}</div>
+              <div>{settings.phone}</div>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
-           <button onClick={onEdit} className="p-3 bg-gray-100 text-indigo-600 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all"><Edit3 className="w-5 h-5" /></button>
-           <button onClick={handlePrint} className="p-3 bg-indigo-700 text-white rounded-2xl shadow-lg shadow-indigo-100 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 px-5">
-             <Printer className="w-5 h-5" /> 
-             <span className="text-xs font-bold">چاپ نسخه</span>
-           </button>
-           <button onClick={onBack} className="p-3 bg-gray-100 rounded-2xl"><X className="w-5 h-5 text-gray-500" /></button>
+
+        {/* Right Design Panel */}
+        <div className="w-72 bg-white border-l border-gray-100 p-6 hidden lg:block">
+           <h3 className="font-bold text-gray-800 mb-4 text-right">طراحی نسخه</h3>
+           <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-[11px] text-gray-500 leading-relaxed text-right">
+              اطلاعات مریض در سرورقی نسخه اکنون به زبان انگلیسی نمایش داده می‌شوند.
+           </div>
         </div>
       </div>
 
-      <div className="rx-preview-container overflow-x-auto">
-        <div ref={printRef} className={`print-area ${isPrePrinted ? 'pre-printed-mode' : ''}`}>
-          <div className="rx-header">
-             <div className="text-right">
-                <h1 className="text-2xl font-black mb-1">{settings.name}</h1>
-                <p className="text-sm font-bold text-blue-100">{settings.doctor}</p>
-                <p className="text-[10px] opacity-80">{settings.specialty}</p>
-             </div>
-             <div className="text-center">
-                <div className="bg-white/20 p-4 rounded-3xl mb-1"><Stethoscope className="w-12 h-12 text-white" /></div>
-                <p className="text-[9px] font-black tracking-[3px] opacity-60 uppercase ltr">{settings.tagline}</p>
-             </div>
-          </div>
-
-          <div className="patient-info-bar">
-             <div className="ltr">NAME: {patient.name}</div>
-             <div>AGE: {patient.age} Yrs</div>
-             <div>SEX: {patient.gender === 'male' ? 'M' : 'F'}</div>
-             <div className="ltr">DATE: {new Date(prescription.date).toLocaleDateString('en-GB')}</div>
-          </div>
-
-          <div className="rx-body">
-             {/* سایدبار در سمت چپ نسخه قرار می‌گیرد */}
-             <div className="rx-sidebar">
-                <div>
-                   <div className="sidebar-section-title">Clinical Record</div>
-                   <div className="space-y-1.5 pt-2">
-                      <div className="vitals-row"><span>BP:</span> <b>{prescription.clinicalRecords.bp}</b></div>
-                      <div className="vitals-row"><span>PR:</span> <b>{prescription.clinicalRecords.pr}</b></div>
-                      <div className="vitals-row"><span>T°:</span> <b>{prescription.clinicalRecords.temp}</b></div>
-                      <div className="vitals-row"><span>Wt:</span> <b>{prescription.clinicalRecords.wt}</b></div>
-                   </div>
-                </div>
-
-                {prescription.cc && (
-                <div>
-                   <div className="sidebar-section-title">Chief Complaint</div>
-                   <div className="text-[10px] font-bold pt-1 leading-relaxed ltr">{prescription.cc}</div>
-                </div>
-                )}
-
-                <div>
-                   <div className="sidebar-section-title">Diagnosis</div>
-                   <div className="text-[10px] font-bold pt-1 leading-relaxed ltr">{prescription.diagnosis}</div>
-                </div>
-
-                <div>
-                   <div className="sidebar-section-title">Instructions</div>
-                   <div className="text-[9px] font-bold italic opacity-60 ltr">Follow up in 1 week.</div>
-                </div>
-             </div>
-
-             {/* محتوای اصلی با لیست داروها در سمت راست سایدبار */}
-             <div className="rx-main-content">
-                <span className="rx-symbol-large">Rx</span>
-                <div className="meds-list mt-8">
-                   {prescription.medications.map((m: any, idx: number) => (
-                      <div key={idx} className="med-item ltr">
-                         <div className="flex-1">
-                            <div className="text-[12pt] font-black">{idx + 1}. {m.name} {m.strength}</div>
-                            <div className="text-[10pt] font-bold text-gray-600 mt-1 pl-4 italic opacity-80">-- {m.instructions}</div>
-                         </div>
-                      </div>
-                   ))}
-                </div>
-             </div>
-          </div>
-
-          <div className="rx-footer">
-             <div className="doctor-stamp-area">
-                <div className="w-32 h-16 border-2 border-dashed border-gray-200 mx-auto mb-1 flex items-center justify-center text-[8px] text-gray-300">Doctor's Stamp & Signature</div>
-                <div className="font-bold text-[10pt]">{settings.doctor}</div>
-             </div>
-             <div className="text-right">
-                <div className="font-bold text-blue-900 mb-1">{settings.name}</div>
-                <div className="opacity-70 text-[8pt]">{settings.address}</div>
-                <div className="font-black text-[9pt] mt-1">{settings.phone}</div>
-             </div>
-          </div>
-        </div>
+      {/* Bottom Footer with Buttons */}
+      <div className="preview-footer">
+         <button onClick={handlePrint} className="bg-[#0f766e] text-white px-8 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-[#0d6d65] active:scale-95 transition-all shadow-lg shadow-teal-100">
+            <Printer className="w-5 h-5" /> 
+            تایید و چاپ
+         </button>
+         <button onClick={handleFullPreview} className="bg-gray-800 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-gray-700 active:scale-95 transition-all shadow-lg shadow-gray-100">
+            <FileText className="w-4 h-4" />
+            پیش‌نمایش پرنت
+         </button>
+         <button onClick={onBack} className="bg-white border border-gray-200 text-gray-600 px-8 py-2.5 rounded-xl font-bold hover:bg-gray-50 active:scale-95 transition-all">
+            انصراف
+         </button>
       </div>
     </div>
   );

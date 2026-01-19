@@ -85,6 +85,7 @@ export const DEFAULT_CLINIC_SETTINGS: ClinicSettings = {
   address: 'کابل، چهارراهی صدارت، کابل - افغانستان',
   phone: '۰۷۸۸۸۸۸۸۸۸ / ۰۷۹۹۹۹۹۹۹۹',
   tagline: 'تداوی با استندردهای جهانی و مراقبت‌های ویژه',
+  language: 'fa',
   printLayout: {
     pageSize: 'A4',
     showPatientName: true,
