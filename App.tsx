@@ -529,46 +529,56 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
       </div>
 
       <div className="preview-content">
-        <div id="print-area" className="shadow-2xl ring-1 ring-gray-200">
+        <div id="print-area" className="shadow-2xl">
           <div className="rx-header">
-            <h1 className="text-2xl font-bold">{settings.name}</h1>
-            <div className="text-lg font-bold">{settings.doctor}</div>
-            <div className="text-sm italic mb-2">{settings.specialty}</div>
+            {/* فضای خالی برای سرورقی چاپی */}
+            <div className="h-[3cm] w-full"></div>
             
-            <div className="flex justify-between border-t pt-4 px-4 text-[10pt] font-bold" style={{ direction: 'ltr' }}>
-              <div>Patient Name: {patient.name}</div>
-              <div>Age: {patient.age}</div>
-              <div>Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</div>
+            <div className="flex justify-between items-center pb-2 mb-2 text-[11pt] font-bold" style={{ direction: 'ltr' }}>
+              <div className="flex gap-4">
+                <span>Name: {patient.name}</span>
+                <span>Age: {patient.age}</span>
+                <span>Phone: {patient.phone}</span>
+              </div>
               <div>Date: {new Date(prescription.date).toLocaleDateString('en-GB')}</div>
             </div>
           </div>
 
           <div className="rx-body">
             <div className="rx-sidebar">
-              <div>
-                <div className="text-[8pt] uppercase text-gray-400">Code</div>
-                <div className="font-bold">{patient.code}</div>
-              </div>
-              <div>
-                <div className="text-[8pt] uppercase text-gray-400">Vitals</div>
-                <div className="text-[9pt] space-y-1">
-                  <div>BP: {prescription.clinicalRecords.bp || '-'}</div>
-                  <div>HR: {prescription.clinicalRecords.hr || '-'}</div>
-                  <div>Wt: {prescription.clinicalRecords.wt || '-'}</div>
+              <div className="flex flex-col items-center">
+                <div className="text-[10pt] font-bold mb-2">V.S</div>
+                <div className="text-[9pt] space-y-3 mt-1 text-center w-full">
+                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">BP</span> <span className="font-bold">{prescription.clinicalRecords.bp || '-'}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">HR</span> <span className="font-bold">{prescription.clinicalRecords.hr || '-'}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">PR</span> <span className="font-bold">{prescription.clinicalRecords.pr || '-'}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">SpO2</span> <span className="font-bold">{prescription.clinicalRecords.spo2 || '-'}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">Temp</span> <span className="font-bold">{prescription.clinicalRecords.temp || '-'}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">Wt</span> <span className="font-bold">{prescription.clinicalRecords.wt || '-'}</span></div>
+                  
+                  {/* CC Section below Wt */}
+                  <div className="flex flex-col items-center pt-2">
+                    <div className="text-[6pt] text-gray-400 uppercase">CC</div>
+                    <div className="font-bold text-[8pt] leading-tight text-center break-words w-full px-1">{prescription.cc || '-'}</div>
+                  </div>
+
+                  {/* Diagnosis Section below CC with more gap */}
+                  <div className="flex flex-col items-center pt-14">
+                    <div className="text-[6pt] text-gray-400 uppercase">Diagnosis</div>
+                    <div className="font-bold text-[8pt] leading-tight text-center break-words w-full px-1">{prescription.diagnosis || '-'}</div>
+                  </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-[8pt] uppercase text-gray-400">C/C</div>
-                <div className="text-[9pt] leading-tight">{prescription.cc || '-'}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-[8pt] uppercase text-gray-400">Diagnosis</div>
-                <div className="text-[9pt] leading-tight">{prescription.diagnosis || '-'}</div>
+              
+              <div className="mt-auto space-y-4">
+                <div className="flex flex-col items-center">
+                  <div className="text-[7pt] text-gray-400">CODE</div>
+                  <div className="font-bold text-[9pt]">{patient.code}</div>
+                </div>
               </div>
             </div>
 
             <div className="rx-main">
-              <div className="rx-symbol-large">Rx</div>
               <ul className="meds-list">
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item">
@@ -577,15 +587,11 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
                   </li>
                 ))}
               </ul>
-              <div className="signature-area mt-auto pt-10 text-[8pt] uppercase font-bold text-gray-300">
-                Doctor's Signature
-              </div>
             </div>
           </div>
 
           <div className="rx-footer">
-            <div className="text-[9pt]">{settings.address}</div>
-            <div className="text-[9pt]">{settings.phone}</div>
+            {/* شماره تماس و امضا حذف شده است */}
           </div>
         </div>
       </div>

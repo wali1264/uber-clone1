@@ -16,19 +16,21 @@
       .fade-in { animation: fadeIn 0.3s ease-in-out; }
       @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       
-      /* حالت عادی (عیناً طبق درخواست کاربر) */
+      /* حالت عادی */
       #print-area {
         width: 210mm;
         min-height: 297mm;
-        padding: 20mm;
+        padding: 5mm 20mm 10mm 5mm; /* پدینگ بالا به ۵ میلی‌متر کاهش یافت */
         background: #fff;
         color: #000;
         font-size: 14px;
         margin: auto;
         box-sizing: border-box;
+        display: flex;
+        flex-direction: column; /* برای فعال شدن margin-top: auto در فوتر */
       }
 
-      /* تنظیمات مخصوص چاپ (عیناً طبق درخواست کاربر) */
+      /* تنظیمات مخصوص چاپ */
       @media print {
         body * {
           visibility: hidden;
@@ -45,7 +47,9 @@
           width: 210mm;
           min-height: 297mm;
           margin: 0;
-          padding: 20mm;
+          padding: 5mm 20mm 10mm 5mm; /* پدینگ بالا به ۵ میلی‌متر کاهش یافت */
+          display: flex;
+          flex-direction: column;
         }
 
         @page {
@@ -57,28 +61,28 @@
       /* استایل‌های تکمیلی برای ساختار داخلی نسخه */
       .rx-header {
         width: 100%;
-        border-bottom: 2px solid #000;
         padding-bottom: 5mm;
         margin-bottom: 5mm;
         text-align: center;
       }
       .rx-body {
         display: flex;
-        flex-direction: row-reverse;
+        flex-direction: row-reverse; /* قرارگیری سایدبار در سمت چپ در حالت RTL */
         flex: 1;
         min-height: 180mm;
       }
       .rx-sidebar {
-        width: 30%;
-        border-left: 1px solid #000;
-        padding: 0 5mm;
+        width: 15mm; /* عرض سایدبار را ثابت و کم کردیم تا کاملاً در حاشیه باشد */
+        padding: 0;
         display: flex;
         flex-direction: column;
         gap: 5mm;
+        text-align: center;
+        border-right: 0.1mm solid #eee; /* یک خط بسیار کمرنگ برای تفکیک حاشیه */
       }
       .rx-main {
-        width: 70%;
-        padding: 0 5mm;
+        flex: 1;
+        padding: 0 10mm;
         display: flex;
         flex-direction: column;
         position: relative;
@@ -101,9 +105,8 @@
       }
       .rx-footer {
         width: 100%;
-        border-top: 2px solid #000;
         padding-top: 5mm;
-        margin-top: auto;
+        margin-top: auto; /* این ویژگی باعث می‌شود فوتر به پایین‌ترین بخش ممکن رانده شود */
         text-align: center;
         font-weight: bold;
       }
