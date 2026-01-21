@@ -20,14 +20,14 @@
       #print-area {
         width: 210mm;
         min-height: 297mm;
-        padding: 5mm 20mm 10mm 5mm; /* پدینگ بالا به ۵ میلی‌متر کاهش یافت */
+        padding: 5mm 10mm 10mm 2mm; /* کاهش حاشیه راست از 20 به 10 برای افزایش فاصله */
         background: #fff;
         color: #000;
         font-size: 14px;
         margin: auto;
         box-sizing: border-box;
         display: flex;
-        flex-direction: column; /* برای فعال شدن margin-top: auto در فوتر */
+        flex-direction: column;
       }
 
       /* تنظیمات مخصوص چاپ */
@@ -47,7 +47,7 @@
           width: 210mm;
           min-height: 297mm;
           margin: 0;
-          padding: 5mm 20mm 10mm 5mm; /* پدینگ بالا به ۵ میلی‌متر کاهش یافت */
+          padding: 5mm 10mm 10mm 2mm;
           display: flex;
           flex-direction: column;
         }
@@ -58,7 +58,6 @@
         }
       }
 
-      /* استایل‌های تکمیلی برای ساختار داخلی نسخه */
       .rx-header {
         width: 100%;
         padding-bottom: 5mm;
@@ -67,18 +66,18 @@
       }
       .rx-body {
         display: flex;
-        flex-direction: row-reverse; /* قرارگیری سایدبار در سمت چپ در حالت RTL */
+        flex-direction: row-reverse;
         flex: 1;
         min-height: 180mm;
       }
       .rx-sidebar {
-        width: 15mm; /* عرض سایدبار را ثابت و کم کردیم تا کاملاً در حاشیه باشد */
+        width: 35mm; /* عرض سایدبار کاهش یافت تا به لبه نزدیک‌تر شود */
         padding: 0;
         display: flex;
         flex-direction: column;
         gap: 5mm;
         text-align: center;
-        border-right: 0.1mm solid #eee; /* یک خط بسیار کمرنگ برای تفکیک حاشیه */
+        border-right: 0.1mm solid #eee;
       }
       .rx-main {
         flex: 1;
@@ -106,12 +105,11 @@
       .rx-footer {
         width: 100%;
         padding-top: 5mm;
-        margin-top: auto; /* این ویژگی باعث می‌شود فوتر به پایین‌ترین بخش ممکن رانده شود */
+        margin-top: auto;
         text-align: center;
         font-weight: bold;
       }
 
-      /* UI Specifics for Preview Screen */
       .preview-modal-overlay {
         position: fixed;
         inset: 0;

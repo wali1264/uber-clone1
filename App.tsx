@@ -245,7 +245,7 @@ const App: React.FC = () => {
                 <div key={pr.id} onClick={() => { setSelectedPrescription(pr); setView('VIEW_PDF'); }} className="bg-white p-5 rounded-2xl shadow-sm cursor-pointer text-right hover:border-indigo-200 border border-transparent">
                   <div className="flex justify-between">
                     <span className="text-xs text-gray-400">{new Date(pr.date).toLocaleDateString()}</span>
-                    <b>{p?.name}</b>
+                    <b className="font-bold">{p?.name}</b>
                   </div>
                   <div className="text-sm text-indigo-600 mt-1">{pr.diagnosis}</div>
                 </div>
@@ -292,13 +292,12 @@ const NavBtn = ({ icon, label, onClick }: any) => (
 );
 
 const PatientForm = ({ onSubmit, onCancel }: any) => {
-  const [d, setD] = useState({ name: '', phone: '', age: '', gender: 'male' });
+  const [d, setD] = useState({ name: '', age: '', gender: 'male', phone: '' });
   return (
     <div className="bg-white p-8 rounded-[2.5rem] shadow-sm space-y-5 text-right fade-in">
       <h2 className="text-xl font-bold text-indigo-900 border-b pb-4">ثبت مریض جدید</h2>
       <div className="space-y-4 pt-2">
         <input className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white outline-none transition-all" placeholder="نام مریض" value={d.name} onChange={e => setD({...d, name: e.target.value})} />
-        <input className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white outline-none transition-all" placeholder="شماره تلیفون" type="tel" value={d.phone} onChange={e => setD({...d, phone: e.target.value})} />
         <input className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 focus:bg-white outline-none transition-all" placeholder="سن" type="number" value={d.age} onChange={e => setD({...d, age: e.target.value})} />
         <select className="w-full p-4 rounded-2xl bg-gray-50 border border-gray-100 outline-none transition-all" value={d.gender} onChange={e => setD({...d, gender: e.target.value})}>
           <option value="male">مذکر</option><option value="female">مونث</option>
@@ -382,7 +381,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
 
       <div className="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 text-right border border-gray-100">
         <label className="font-bold text-indigo-700 flex items-center justify-end gap-2">
-          شکایت مریض (C/C) <Activity className="w-4 h-4" />
+          شکایت مریض (Chief Complain) <Activity className="w-4 h-4" />
         </label>
         <textarea className="w-full p-4 bg-gray-50 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 min-h-[80px]" placeholder="علائم مریض..." value={cc} onChange={e => setCc(e.target.value)} />
         <div className="flex flex-wrap gap-1 justify-end">
@@ -426,7 +425,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
             <div key={i} className="flex justify-between items-center p-3 bg-indigo-50 rounded-2xl ltr shadow-sm">
               <button onClick={() => setMeds(meds.filter((_, idx) => idx !== i))} className="p-2 hover:bg-red-50 rounded-full transition-colors"><Trash2 className="w-4 h-4 text-red-500" /></button>
               <div className="text-left flex-1 px-4">
-                <b className="text-indigo-900">{m.name}</b>
+                <b className="text-indigo-900 font-bold">{m.name}</b>
                 <div className="text-[10px] text-indigo-400 italic mt-0.5">{m.instructions}</div>
               </div>
             </div>
@@ -456,7 +455,7 @@ const DrugSettings = ({ db }: any) => {
           <div key={d.id} className="bg-white p-4 rounded-2xl shadow-sm text-right border border-gray-50 flex justify-between items-center">
             <span className="text-[10px] text-indigo-300 font-mono uppercase">{d.category}</span>
             <div className="flex flex-col items-end">
-              <b className="text-gray-800">{d.name}</b>
+              <b className="text-gray-800 font-bold">{d.name}</b>
               <span className="text-xs text-gray-400">{d.defaultStrength}</span>
             </div>
           </div>
@@ -531,35 +530,36 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
       <div className="preview-content">
         <div id="print-area" className="shadow-2xl">
           <div className="rx-header">
-            {/* فضای خالی برای سرورقی چاپی */}
-            <div className="h-[3cm] w-full"></div>
+            {/* فضای خالی برای سرورقی چاپی - ۴ سانتی‌متر */}
+            <div className="h-[4cm] w-full"></div>
             
-            <div className="flex justify-between items-center pb-2 mb-2 text-[11pt] font-bold" style={{ direction: 'ltr' }}>
-              <div className="flex gap-4">
+            <div className="flex justify-between items-baseline pb-2 mb-2 text-[11pt] font-bold mt-8" style={{ direction: 'ltr' }}>
+              <div className="flex gap-20 pl-8">
                 <span>Name: {patient.name}</span>
                 <span>Age: {patient.age}</span>
-                <span>Phone: {patient.phone}</span>
+                <span className="relative -top-[4px]">Gender: {patient.gender === 'male' ? 'Male' : patient.gender === 'female' ? 'Female' : patient.gender}</span>
               </div>
-              <div>Date: {new Date(prescription.date).toLocaleDateString('en-GB')}</div>
+              <div className="pr-8 relative -top-[4px]">Date: {new Date(prescription.date).toLocaleDateString('en-GB')}</div>
             </div>
           </div>
 
           <div className="rx-body">
             <div className="rx-sidebar">
               <div className="flex flex-col items-center">
-                <div className="text-[10pt] font-bold mb-2">V.S</div>
-                <div className="text-[9pt] space-y-3 mt-1 text-center w-full">
-                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">BP</span> <span className="font-bold">{prescription.clinicalRecords.bp || '-'}</span></div>
-                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">HR</span> <span className="font-bold">{prescription.clinicalRecords.hr || '-'}</span></div>
-                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">PR</span> <span className="font-bold">{prescription.clinicalRecords.pr || '-'}</span></div>
-                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">SpO2</span> <span className="font-bold">{prescription.clinicalRecords.spo2 || '-'}</span></div>
-                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">Temp</span> <span className="font-bold">{prescription.clinicalRecords.temp || '-'}</span></div>
-                  <div className="flex flex-col gap-0.5"><span className="text-[7pt] text-gray-400">Wt</span> <span className="font-bold">{prescription.clinicalRecords.wt || '-'}</span></div>
+                <div className="text-[8pt] font-bold mb-1">Clinical Record</div>
+                <div className="text-[8pt] space-y-1.5 mt-1 text-left w-full pl-5 pr-1 flex flex-col items-start" style={{ direction: 'ltr' }}>
+                  {/* مخفف‌ها در سمت چپ و مقادیر در سمت راست با فاصله کم */}
+                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>BP:</span><span className="font-bold">{prescription.clinicalRecords.bp || '-'}</span></div>
+                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>HR:</span><span className="font-bold">{prescription.clinicalRecords.hr || '-'}</span></div>
+                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>PR:</span><span className="font-bold">{prescription.clinicalRecords.pr || '-'}</span></div>
+                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>SpO2:</span><span className="font-bold">{prescription.clinicalRecords.spo2 || '-'}</span></div>
+                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>Temp:</span><span className="font-bold">{prescription.clinicalRecords.temp || '-'}</span></div>
+                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>Wt:</span><span className="font-bold">{prescription.clinicalRecords.wt || '-'}</span></div>
                   
-                  {/* CC Section below Wt */}
-                  <div className="flex flex-col items-center pt-2">
-                    <div className="text-[6pt] text-gray-400 uppercase">CC</div>
-                    <div className="font-bold text-[8pt] leading-tight text-center break-words w-full px-1">{prescription.cc || '-'}</div>
+                  {/* CC Section below Wt styled exactly as requested: Title on TOP, Content BOTTOM */}
+                  <div className="flex flex-col border-b border-gray-100 pb-1 pt-3 text-left w-full">
+                    <span className="text-[7pt] text-gray-500 uppercase font-bold mb-1">Chief Complain</span>
+                    <div className="font-bold text-[8pt] break-words leading-tight pl-1">{prescription.cc || '-'}</div>
                   </div>
 
                   {/* Diagnosis Section below CC with more gap */}
@@ -591,7 +591,6 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
           </div>
 
           <div className="rx-footer">
-            {/* شماره تماس و امضا حذف شده است */}
           </div>
         </div>
       </div>
