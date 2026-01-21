@@ -492,6 +492,24 @@ const ClinicSettingsForm = ({ settings, onSave, storedPin, onSavePin, onBack }: 
       </div>
 
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
+        <h3 className="font-bold border-r-4 border-emerald-600 pr-2 text-emerald-700">انتخاب چاپ روی A5</h3>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setD({...d, printLayout: {...d.printLayout, pageSize: 'A4'}})}
+            className={`flex-1 p-4 rounded-2xl font-bold transition-all border-2 ${d.printLayout.pageSize === 'A4' ? 'bg-indigo-50 border-indigo-600 text-indigo-700' : 'bg-gray-50 border-transparent text-gray-400'}`}
+          >
+            A4
+          </button>
+          <button 
+            onClick={() => setD({...d, printLayout: {...d.printLayout, pageSize: 'A5'}})}
+            className={`flex-1 p-4 rounded-2xl font-bold transition-all border-2 ${d.printLayout.pageSize === 'A5' ? 'bg-indigo-50 border-indigo-600 text-indigo-700' : 'bg-gray-50 border-transparent text-gray-400'}`}
+          >
+            A5
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
         <h3 className="font-bold border-r-4 border-red-600 pr-2 text-red-700">تغییر رمز ورود (PIN)</h3>
         <div className="flex flex-col gap-2">
           <label className="text-xs text-gray-400 font-bold pr-1">رمز عبور جدید سیستم</label>
@@ -528,7 +546,10 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
       </div>
 
       <div className="preview-content">
-        <div id="print-area" className="shadow-2xl">
+        <div id="print-area" className="shadow-2xl" style={{ 
+          width: settings.printLayout.pageSize === 'A5' ? '148mm' : '210mm', 
+          minHeight: settings.printLayout.pageSize === 'A5' ? '210mm' : '297mm' 
+        }}>
           <div className="rx-header">
             {/* فضای خالی برای سرورقی چاپی - ۴ سانتی‌متر */}
             <div className="h-[4cm] w-full"></div>
