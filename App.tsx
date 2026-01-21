@@ -20,7 +20,8 @@ import {
   Key,
   Edit3,
   Save,
-  FileText
+  FileText,
+  PlusCircle
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS } from './constants';
@@ -318,6 +319,8 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
   const [vitals, setVitals] = useState({ bp: '', hr: '', pr: '', spo2: '', temp: '', wt: '' });
   const [search, setSearch] = useState('');
   const [drugResults, setDrugResults] = useState<any[]>([]);
+  const [isAddingManual, setIsAddingManual] = useState(false);
+  const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
 
   useEffect(() => {
     if (!db) return;
@@ -364,6 +367,22 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
     });
   };
 
+  const handleAddManualDrug = async () => {
+    if (!manualDrug.name) return;
+    const newId = `custom-${Date.now()}`;
+    const drugData = { ...manualDrug, id: newId };
+    
+    // Save to DB
+    const tx = db.transaction(DRUG_STORE, 'readwrite');
+    tx.objectStore(DRUG_STORE).put(drugData);
+    
+    // Add to current meds
+    setMeds([...meds, { ...drugData, quantity: '1' }]);
+    setIsAddingManual(false);
+    setManualDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+    setSearch('');
+  };
+
   return (
     <div className="space-y-6 pb-12 fade-in">
       <div className="bg-slate-900 p-6 rounded-[2rem] text-white text-right shadow-xl">
@@ -407,10 +426,35 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
         <div className="flex justify-between items-center border-b pb-3 mb-2">
           <div className="relative flex-1 max-w-[200px]">
             <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <input className="text-xs w-full py-2 pr-7 pl-2 border rounded-xl outline-none focus:ring-1 focus:ring-indigo-300" placeholder="Search 500k drugs..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input className="text-xs w-full py-2 pr-7 pl-2 border rounded-xl outline-none focus:ring-1 focus:ring-indigo-300" placeholder="Search drugs..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <h3 className="font-bold text-indigo-700 flex items-center gap-2">دواهای تجویزی <Database className="w-4 h-4" /></h3>
         </div>
+
+        {/* Manual Add Trigger */}
+        {!isAddingManual ? (
+          <button 
+            onClick={() => { setIsAddingManual(true); setManualDrug({...manualDrug, name: search}); }}
+            className="w-full p-3 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold border border-emerald-100 flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
+          >
+            <PlusCircle className="w-4 h-4" /> اضافه کردن داروی جدید
+          </button>
+        ) : (
+          <div className="bg-emerald-50 p-4 rounded-2xl space-y-3 border border-emerald-100 fade-in">
+            <div className="text-xs font-bold text-emerald-800">ثبت داروی جدید</div>
+            <input className="w-full p-3 bg-white border-0 rounded-xl text-xs" placeholder="نام دوا" value={manualDrug.name} onChange={e => setManualDrug({...manualDrug, name: e.target.value})} />
+            <div className="flex gap-2">
+              <input className="flex-1 p-3 bg-white border-0 rounded-xl text-xs" placeholder="دوز (e.g. 500mg)" value={manualDrug.strength} onChange={e => setManualDrug({...manualDrug, strength: e.target.value})} />
+              <input className="flex-1 p-3 bg-white border-0 rounded-xl text-xs" placeholder="کتگوری" value={manualDrug.category} onChange={e => setManualDrug({...manualDrug, category: e.target.value})} />
+            </div>
+            <input className="w-full p-3 bg-white border-0 rounded-xl text-xs" placeholder="طریقه مصرف" value={manualDrug.instructions} onChange={e => setManualDrug({...manualDrug, instructions: e.target.value})} />
+            <div className="flex gap-2">
+              <button onClick={handleAddManualDrug} className="flex-1 bg-emerald-600 text-white p-3 rounded-xl font-bold text-xs">ثبت و اضافه</button>
+              <button onClick={() => setIsAddingManual(false)} className="bg-white text-gray-400 p-3 rounded-xl font-bold text-xs border border-emerald-100">لغو</button>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
           {drugResults.map(d => (
             <button key={d.id} onClick={() => setMeds([...meds, { ...d, quantity: '1', instructions: d.defaultInstructions }])} className="w-full p-3 bg-gray-50 hover:bg-indigo-50 transition-all rounded-xl text-right text-sm border border-transparent hover:border-indigo-100 flex justify-between items-center">
@@ -418,8 +462,9 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
               <span className="font-bold">{d.name} <span className="text-gray-400 text-xs font-normal">({d.defaultStrength})</span></span>
             </button>
           ))}
-          {drugResults.length === 0 && <div className="text-center text-xs text-gray-400 py-4">موردی یافت نشد</div>}
+          {drugResults.length === 0 && !isAddingManual && <div className="text-center text-xs text-gray-400 py-4">موردی یافت نشد</div>}
         </div>
+
         <div className="border-t pt-4 space-y-2">
           {meds.map((m, i) => (
             <div key={i} className="flex justify-between items-center p-3 bg-indigo-50 rounded-2xl ltr shadow-sm">
