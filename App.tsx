@@ -170,6 +170,11 @@ const App: React.FC = () => {
           <h1 className="text-2xl font-bold">ورود به سیستم</h1>
           <input type="password" placeholder="PIN" className="w-full p-4 rounded-2xl bg-gray-50 text-center text-2xl" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
           <button onClick={handleLogin} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold">ورود</button>
+          <div className="pt-4 border-t border-gray-100">
+            <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">
+              Meraj Salehi Programming and Production Company
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -277,6 +282,8 @@ const App: React.FC = () => {
   );
 };
 
+// --- Shared Helper Components ---
+
 const QuickAction = ({ icon, title, onClick }: any) => (
   <button onClick={onClick} className="flex items-center gap-4 bg-white p-5 rounded-3xl border shadow-sm w-full text-right hover:bg-gray-50 transition-all">
     <div className="bg-gray-100 p-4 rounded-2xl text-indigo-600">{icon}</div>
@@ -291,6 +298,8 @@ const NavBtn = ({ icon, label, onClick }: any) => (
     <span className="text-[10px] font-bold">{label}</span>
   </button>
 );
+
+// --- Form & View Components ---
 
 const PatientForm = ({ onSubmit, onCancel }: any) => {
   const [d, setD] = useState({ name: '', age: '', gender: 'male', phone: '' });
@@ -321,6 +330,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
   const [drugResults, setDrugResults] = useState<any[]>([]);
   const [isAddingManual, setIsAddingManual] = useState(false);
   const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!db) return;
@@ -331,19 +341,34 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
     const results: any[] = [];
     const searchLower = search.toLowerCase();
     
-    nameIndex.openCursor().onsuccess = (e: any) => {
+    // Optimized search for large database
+    const request = search ? nameIndex.openCursor(IDBKeyRange.bound(searchLower, searchLower + '\uffff')) : nameIndex.openCursor();
+    
+    request.onsuccess = (e: any) => {
       const cursor = e.target.result;
       if (cursor && results.length < 50) { 
-        const drugName = cursor.value.name.toLowerCase();
-        if (!search || drugName.includes(searchLower)) {
-          results.push(cursor.value);
-        }
+        results.push(cursor.value);
         cursor.continue();
       } else {
-        setDrugResults(results);
+        // Fallback search if prefix didn't yield enough results and search term is present
+        if (results.length < 5 && search) {
+           nameIndex.openCursor().onsuccess = (ev: any) => {
+             const c = ev.target.result;
+             if (c && results.length < 50) {
+               if (c.value.name.toLowerCase().includes(searchLower) && !results.some(r => r.id === c.value.id)) {
+                 results.push(c.value);
+               }
+               c.continue();
+             } else {
+               setDrugResults(results);
+             }
+           };
+        } else {
+          setDrugResults(results);
+        }
       }
     };
-  }, [search, db]);
+  }, [search, db, refreshTrigger]);
 
   const toggleCC = (item: string) => {
     setCc(prev => {
@@ -370,17 +395,39 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
   const handleAddManualDrug = async () => {
     if (!manualDrug.name) return;
     const newId = `custom-${Date.now()}`;
-    const drugData = { ...manualDrug, id: newId };
     
-    // Save to DB
-    const tx = db.transaction(DRUG_STORE, 'readwrite');
-    tx.objectStore(DRUG_STORE).put(drugData);
+    // Map to DB structure for permanent storage
+    const drugData = { 
+      id: newId,
+      name: manualDrug.name,
+      defaultStrength: manualDrug.strength,
+      defaultInstructions: manualDrug.instructions,
+      category: manualDrug.category
+    };
     
-    // Add to current meds
-    setMeds([...meds, { ...drugData, quantity: '1' }]);
-    setIsAddingManual(false);
-    setManualDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
-    setSearch('');
+    // Save to DB permanently
+    try {
+      const tx = db.transaction(DRUG_STORE, 'readwrite');
+      const store = tx.objectStore(DRUG_STORE);
+      const putReq = store.put(drugData);
+      
+      putReq.onsuccess = () => {
+        // Add to current meds list
+        setMeds([...meds, { ...drugData, strength: manualDrug.strength, quantity: '1', instructions: manualDrug.instructions }]);
+        setIsAddingManual(false);
+        setManualDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+        setSearch('');
+        setRefreshTrigger(prev => prev + 1); // Trigger search refresh to ensure newly added drug is searchable immediately
+      };
+    } catch (e) {
+      console.error('Error saving drug:', e);
+    }
+  };
+
+  const updateMed = (index: number, field: string, value: string) => {
+    const newMedsList = [...meds];
+    newMedsList[index] = { ...newMedsList[index], [field]: value };
+    setMeds(newMedsList);
   };
 
   return (
@@ -393,7 +440,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
       <div className="bg-white p-5 rounded-[2rem] shadow-sm grid grid-cols-3 gap-2 border border-gray-100">
         {Object.keys(vitals).map(k => (
           <div key={k} className="relative">
-            <input placeholder={k.toUpperCase()} className="w-full p-2.5 bg-gray-50 rounded-xl text-center text-xs outline-none focus:ring-1 focus:ring-indigo-300 transition-all" onChange={e => setVitals({...vitals, [k]: e.target.value})} />
+            <input placeholder={k.toUpperCase()} className="w-full p-2.5 bg-gray-50 rounded-xl text-center text-xs outline-none focus:ring-1 focus:ring-indigo-300 transition-all" onChange={e => setVitals({...vitals, [k]: (e.target as HTMLInputElement).value})} />
           </div>
         ))}
       </div>
@@ -431,7 +478,6 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
           <h3 className="font-bold text-indigo-700 flex items-center gap-2">دواهای تجویزی <Database className="w-4 h-4" /></h3>
         </div>
 
-        {/* Manual Add Trigger */}
         {!isAddingManual ? (
           <button 
             onClick={() => { setIsAddingManual(true); setManualDrug({...manualDrug, name: search}); }}
@@ -457,7 +503,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
 
         <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
           {drugResults.map(d => (
-            <button key={d.id} onClick={() => setMeds([...meds, { ...d, quantity: '1', instructions: d.defaultInstructions }])} className="w-full p-3 bg-gray-50 hover:bg-indigo-50 transition-all rounded-xl text-right text-sm border border-transparent hover:border-indigo-100 flex justify-between items-center">
+            <button key={d.id} onClick={() => setMeds([...meds, { ...d, strength: d.defaultStrength, quantity: '1', instructions: d.defaultInstructions }])} className="w-full p-3 bg-gray-50 hover:bg-indigo-50 transition-all rounded-xl text-right text-sm border border-transparent hover:border-indigo-100 flex justify-between items-center">
               <span className="text-[10px] bg-white px-2 py-0.5 rounded-full text-indigo-400 font-mono">{d.category}</span>
               <span className="font-bold">{d.name} <span className="text-gray-400 text-xs font-normal">({d.defaultStrength})</span></span>
             </button>
@@ -467,11 +513,41 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
 
         <div className="border-t pt-4 space-y-2">
           {meds.map((m, i) => (
-            <div key={i} className="flex justify-between items-center p-3 bg-indigo-50 rounded-2xl ltr shadow-sm">
-              <button onClick={() => setMeds(meds.filter((_, idx) => idx !== i))} className="p-2 hover:bg-red-50 rounded-full transition-colors"><Trash2 className="w-4 h-4 text-red-500" /></button>
-              <div className="text-left flex-1 px-4">
-                <b className="text-indigo-900 font-bold">{m.name}</b>
-                <div className="text-[10px] text-indigo-400 italic mt-0.5">{m.instructions}</div>
+            <div key={i} className="flex flex-col p-3 bg-indigo-50 rounded-2xl ltr shadow-sm space-y-2 border border-indigo-100/50">
+              <div className="flex justify-between items-center">
+                <button onClick={() => setMeds(meds.filter((_, idx) => idx !== i))} className="p-2 hover:bg-red-50 rounded-full transition-colors"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                <div className="text-left flex-1 px-4">
+                  <b className="text-indigo-900 font-bold">{m.name}</b>
+                </div>
+              </div>
+              <div className="flex gap-2 items-center px-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[8px] text-indigo-400 font-bold ml-1 uppercase">Dose</span>
+                  <input 
+                    className="w-24 p-2 text-[10px] rounded-lg border-none bg-white/70 focus:bg-white outline-none shadow-sm transition-all" 
+                    placeholder="Dose" 
+                    value={m.strength || ''} 
+                    onChange={e => updateMed(i, 'strength', e.target.value)} 
+                  />
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[8px] text-indigo-400 font-bold ml-1 uppercase">Qty</span>
+                  <input 
+                    className="w-14 p-2 text-[10px] rounded-lg border-none bg-white/70 focus:bg-white outline-none text-center shadow-sm transition-all" 
+                    placeholder="Qty" 
+                    value={m.quantity || ''} 
+                    onChange={e => updateMed(i, 'quantity', e.target.value)} 
+                  />
+                </div>
+                <div className="flex-1 flex flex-col gap-0.5">
+                  <span className="text-[8px] text-indigo-400 font-bold ml-1 uppercase">Instructions</span>
+                  <input 
+                    className="w-full p-2 text-[10px] rounded-lg border-none bg-white/70 focus:bg-white outline-none shadow-sm transition-all" 
+                    placeholder="Instructions" 
+                    value={m.instructions || ''} 
+                    onChange={e => updateMed(i, 'instructions', e.target.value)} 
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -596,7 +672,6 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
           minHeight: settings.printLayout.pageSize === 'A5' ? '210mm' : '297mm' 
         }}>
           <div className="rx-header">
-            {/* فضای خالی برای سرورقی چاپی - ۴ سانتی‌متر */}
             <div className="h-[4cm] w-full"></div>
             
             <div className="flex justify-between items-baseline pb-2 mb-2 text-[11pt] font-bold mt-8" style={{ direction: 'ltr' }}>
@@ -614,7 +689,6 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
               <div className="flex flex-col items-center">
                 <div className="text-[8pt] font-bold mb-1">Clinical Record</div>
                 <div className="text-[8pt] space-y-1.5 mt-1 text-left w-full pl-5 pr-1 flex flex-col items-start" style={{ direction: 'ltr' }}>
-                  {/* مخفف‌ها در سمت چپ و مقادیر در سمت راست با فاصله کم */}
                   <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>BP:</span><span className="font-bold">{prescription.clinicalRecords.bp || '-'}</span></div>
                   <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>HR:</span><span className="font-bold">{prescription.clinicalRecords.hr || '-'}</span></div>
                   <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>PR:</span><span className="font-bold">{prescription.clinicalRecords.pr || '-'}</span></div>
@@ -622,13 +696,11 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
                   <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>Temp:</span><span className="font-bold">{prescription.clinicalRecords.temp || '-'}</span></div>
                   <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>Wt:</span><span className="font-bold">{prescription.clinicalRecords.wt || '-'}</span></div>
                   
-                  {/* CC Section below Wt styled exactly as requested: Title on TOP, Content BOTTOM */}
                   <div className="flex flex-col border-b border-gray-100 pb-1 pt-3 text-left w-full">
                     <span className="text-[7pt] text-gray-500 uppercase font-bold mb-1">Chief Complain</span>
                     <div className="font-bold text-[8pt] break-words leading-tight pl-1">{prescription.cc || '-'}</div>
                   </div>
 
-                  {/* Diagnosis Section below CC with more gap */}
                   <div className="flex flex-col items-center pt-14">
                     <div className="text-[6pt] text-gray-400 uppercase">Diagnosis</div>
                     <div className="font-bold text-[8pt] leading-tight text-center break-words w-full px-1">{prescription.diagnosis || '-'}</div>
@@ -647,9 +719,16 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
             <div className="rx-main">
               <ul className="meds-list">
                 {prescription.medications.map((m: any, idx: number) => (
-                  <li key={idx} className="med-item">
-                    <div className="font-bold text-[12pt]">{idx + 1}. {m.name} {m.strength}</div>
-                    <div className="text-[10pt] text-gray-600 italic ml-6">-- {m.instructions}</div>
+                  <li key={idx} className="med-item mb-5">
+                    <div className="font-bold text-[12pt] whitespace-nowrap overflow-hidden text-ellipsis flex items-baseline justify-between">
+                      <span>{idx + 1}. {m.name} {m.strength}</span>
+                      {m.quantity && m.quantity !== '1' && (
+                        <span className="font-normal text-[11pt] text-gray-800 pr-10">N: {m.quantity}</span>
+                      )}
+                    </div>
+                    <div className="text-[10pt] text-gray-600 italic font-normal ml-8 mt-1">
+                      -- {m.instructions}
+                    </div>
                   </li>
                 ))}
               </ul>
