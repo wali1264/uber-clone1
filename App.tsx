@@ -21,14 +21,16 @@ import {
   Edit3,
   Save,
   FileText,
-  PlusCircle
+  PlusCircle,
+  Phone,
+  Tag
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS } from './constants';
 
 // --- Database Configuration ---
 const DB_NAME = 'AsanNoskhaProfessionalDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; 
 const DRUG_STORE = 'drugs_master';
 
 const initDB = (): Promise<IDBDatabase> => {
@@ -39,6 +41,12 @@ const initDB = (): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(DRUG_STORE)) {
         const store = db.createObjectStore(DRUG_STORE, { keyPath: 'id' });
         store.createIndex('name', 'name', { unique: false });
+        store.createIndex('name_lower', 'name_lower', { unique: false });
+      } else {
+        const store = request.transaction!.objectStore(DRUG_STORE);
+        if (!store.indexNames.contains('name_lower')) {
+          store.createIndex('name_lower', 'name_lower', { unique: false });
+        }
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -72,10 +80,10 @@ const App: React.FC = () => {
   const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(DEFAULT_CLINIC_SETTINGS);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
-  const [draftPrescription, setDraftPrescription] = useState<Partial<Prescription> | null>(null);
   const [searchQuery, searchQuerySet] = useState('');
   const [db, setDb] = useState<IDBDatabase | null>(null);
   const [isDbPopulating, setIsDbPopulating] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   const getAdjustedTime = () => Date.now();
 
@@ -94,7 +102,7 @@ const App: React.FC = () => {
           
           if (currentCount < TARGET_COUNT) {
             setIsDbPopulating(true);
-            INITIAL_DRUGS.forEach(d => store.put(d));
+            INITIAL_DRUGS.forEach(d => store.put({ ...d, name_lower: d.name.toLowerCase() }));
             
             const forms = ['Tab ', 'Syr ', 'Inj ', 'Cap ', 'Drops ', 'Cream ', 'Oint ', 'Spray ', 'Susp ', 'Gel '];
             const stems = ['Amoxi', 'Cipro', 'Levo', 'Atorva', 'Omepra', 'Paraceta', 'Ibupro', 'Azithro', 'Ceftri', 'Metroni', 'Losar', 'Amlodi', 'Bisopro', 'Panto', 'Esomep', 'Diclo', 'Napro', 'Mefena', 'Celeco', 'Trana', 'Keto', 'Melo', 'Indo', 'Fluco', 'Clarithro', 'Roxy', 'Terbi', 'Ketoco', 'Predni', 'Dexa', 'Hydro', 'Betame'];
@@ -111,10 +119,12 @@ const App: React.FC = () => {
                 const form = forms[i % forms.length];
                 const stem = stems[i % stems.length];
                 const suffix = suffixes[i % suffixes.length];
+                const name = `${form}${stem}${suffix}-${i}`;
                 
                 storeBatch.put({
                   id: `gen-${i}`,
-                  name: `${form}${stem}${suffix}-${i}`,
+                  name: name,
+                  name_lower: name.toLowerCase(),
                   category: categories[i % categories.length],
                   defaultStrength: `${((i % 20) + 1) * 25}mg`,
                   defaultInstructions: 'Daily Use - After Meal'
@@ -141,16 +151,19 @@ const App: React.FC = () => {
       if (savedS) setClinicSettings(JSON.parse(savedS));
       if (savedPin) setStoredPin(savedPin);
       if (sessionStorage.getItem('isLoggedIn') === 'true') setIsLoggedIn(true);
+      
+      setIsDataLoaded(true);
     };
     loadAppData();
   }, []);
 
   useEffect(() => {
+    if (!isDataLoaded) return;
     localStorage.setItem('patients', JSON.stringify(patients));
     localStorage.setItem('prescriptions', JSON.stringify(prescriptions));
     localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
     localStorage.setItem('doctorPin', storedPin);
-  }, [patients, prescriptions, clinicSettings, storedPin]);
+  }, [patients, prescriptions, clinicSettings, storedPin, isDataLoaded]);
 
   const handleLogin = () => {
     if (pin === storedPin) { setIsLoggedIn(true); sessionStorage.setItem('isLoggedIn', 'true'); }
@@ -215,7 +228,7 @@ const App: React.FC = () => {
         {view === 'NEW_PATIENT' && <PatientForm onSubmit={(p: any) => {
           const newId = Math.random().toString(36).substr(2, 9);
           const newP = { ...p, id: newId, code: `P-${1000 + patients.length + 1}`, createdAt: getAdjustedTime() } as Patient;
-          setPatients([newP, ...patients]); setSelectedPatientId(newId); setDraftPrescription(null); setView('NEW_PRESCRIPTION');
+          setPatients([newP, ...patients]); setSelectedPatientId(newId); setView('NEW_PRESCRIPTION');
         }} onCancel={() => setView('HOME')} />}
 
         {view === 'PATIENTS' && (
@@ -336,13 +349,19 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
     if (!db) return;
     const tx = db.transaction(DRUG_STORE, 'readonly');
     const store = tx.objectStore(DRUG_STORE);
-    const nameIndex = store.index('name');
     
+    // Using name_lower index for instant first-letter search
+    const index = store.index('name_lower');
     const results: any[] = [];
     const searchLower = search.toLowerCase();
     
-    // Optimized search for large database
-    const request = search ? nameIndex.openCursor(IDBKeyRange.bound(searchLower, searchLower + '\uffff')) : nameIndex.openCursor();
+    if (!searchLower) {
+      setDrugResults([]);
+      return;
+    }
+
+    const range = IDBKeyRange.bound(searchLower, searchLower + '\uffff');
+    const request = index.openCursor(range);
     
     request.onsuccess = (e: any) => {
       const cursor = e.target.result;
@@ -350,22 +369,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
         results.push(cursor.value);
         cursor.continue();
       } else {
-        // Fallback search if prefix didn't yield enough results and search term is present
-        if (results.length < 5 && search) {
-           nameIndex.openCursor().onsuccess = (ev: any) => {
-             const c = ev.target.result;
-             if (c && results.length < 50) {
-               if (c.value.name.toLowerCase().includes(searchLower) && !results.some(r => r.id === c.value.id)) {
-                 results.push(c.value);
-               }
-               c.continue();
-             } else {
-               setDrugResults(results);
-             }
-           };
-        } else {
-          setDrugResults(results);
-        }
+        setDrugResults(results);
       }
     };
   }, [search, db, refreshTrigger]);
@@ -400,6 +404,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
     const drugData = { 
       id: newId,
       name: manualDrug.name,
+      name_lower: manualDrug.name.toLowerCase(),
       defaultStrength: manualDrug.strength,
       defaultInstructions: manualDrug.instructions,
       category: manualDrug.category
@@ -417,7 +422,7 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
         setIsAddingManual(false);
         setManualDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
         setSearch('');
-        setRefreshTrigger(prev => prev + 1); // Trigger search refresh to ensure newly added drug is searchable immediately
+        setRefreshTrigger(prev => prev + 1);
       };
     } catch (e) {
       console.error('Error saving drug:', e);
@@ -564,12 +569,70 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
 
 const DrugSettings = ({ db }: any) => {
   const [drugs, setDrugs] = useState<any[]>([]);
-  useEffect(() => {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newDrug, setNewDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+
+  const loadDrugs = () => {
     db.transaction(DRUG_STORE).objectStore(DRUG_STORE).getAll(null, 100).onsuccess = (e: any) => setDrugs(e.target.result);
+  };
+
+  useEffect(() => {
+    loadDrugs();
   }, [db]);
+
+  const handleSaveNewDrug = async () => {
+    if (!newDrug.name) return;
+    const drugData = {
+      id: `man-${Date.now()}`,
+      name: newDrug.name,
+      name_lower: newDrug.name.toLowerCase(),
+      defaultStrength: newDrug.strength,
+      defaultInstructions: newDrug.instructions,
+      category: newDrug.category
+    };
+
+    try {
+      const tx = db.transaction(DRUG_STORE, 'readwrite');
+      const store = tx.objectStore(DRUG_STORE);
+      store.put(drugData).onsuccess = () => {
+        setIsAdding(false);
+        setNewDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+        loadDrugs();
+      };
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div className="space-y-4 fade-in">
       <h2 className="font-bold text-center text-indigo-900 border-b pb-4">بانک داروهای آماده</h2>
+
+      {!isAdding ? (
+        <button 
+          onClick={() => setIsAdding(true)}
+          className="w-full p-5 bg-indigo-50 text-indigo-700 rounded-3xl font-bold flex items-center justify-center gap-2 border border-indigo-100 hover:bg-indigo-100 transition-all"
+        >
+          <PlusCircle className="w-5 h-5" /> افزودن دوا جدید
+        </button>
+      ) : (
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-indigo-100 space-y-4 fade-in">
+          <div className="font-bold text-indigo-900">مشخصات دوای جدید</div>
+          <div className="space-y-3">
+            <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="نام دوا" value={newDrug.name} onChange={e => setNewDrug({...newDrug, name: e.target.value})} />
+            <div className="flex gap-2">
+              <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="دوز (e.g. 500mg)" value={newDrug.strength} onChange={e => setNewDrug({...newDrug, strength: e.target.value})} />
+              <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="کتگوری" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
+            </div>
+            <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="طریقه مصرف" value={newDrug.instructions} onChange={e => setNewDrug({...newDrug, instructions: e.target.value})} />
+            <div className="flex gap-3 pt-2">
+              <button onClick={handleSaveNewDrug} className="flex-2 bg-indigo-600 text-white p-4 rounded-2xl font-bold">ذخیره در بانک</button>
+              <button onClick={() => setIsAdding(false)} className="bg-white text-gray-400 p-4 rounded-2xl font-bold">لغو</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="text-[10px] text-center text-gray-400 italic">نمایش ۱۰۰ مورد تصادفی از کل ۵۰۰,۰۰۰ رکورد</p>
       <div className="grid gap-2">
         {drugs.map(d => (
@@ -587,13 +650,13 @@ const DrugSettings = ({ db }: any) => {
 };
 
 const ClinicSettingsForm = ({ settings, onSave, storedPin, onSavePin, onBack }: any) => {
-  const [d, setD] = useState(settings);
+  const [d, setD] = useState<ClinicSettings>(settings);
   const [newPin, setNewPin] = useState(storedPin);
 
   const handleSave = () => {
     onSave(d);
     onSavePin(newPin);
-    alert('تنظیمات با موفقیت ذخیره شد!');
+    alert('تمام تغییرات با موفقیت در سیستم ذخیره شد!');
   };
 
   return (
@@ -604,16 +667,43 @@ const ClinicSettingsForm = ({ settings, onSave, storedPin, onSavePin, onBack }: 
       </div>
 
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-        <h3 className="font-bold border-r-4 border-indigo-600 pr-2 text-indigo-700">اطلاعات پایه</h3>
+        <h3 className="font-bold border-r-4 border-indigo-600 pr-2 text-indigo-700 flex items-center gap-2">اطلاعات پایه <Edit3 className="w-4 h-4"/></h3>
         <div className="space-y-3">
-          <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="Clinic Name" value={d.name} onChange={e => setD({...d, name: e.target.value})} />
-          <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="Doctor Name" value={d.doctor} onChange={e => setD({...d, doctor: e.target.value})} />
-          <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="Clinic Address" value={d.address} onChange={e => setD({...d, address: e.target.value})} />
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 font-bold pr-2">نام کلینیک / مرکز صحی</label>
+            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="نام کلینیک" value={d.name} onChange={e => setD({...d, name: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 font-bold pr-2">نام کامل داکتر</label>
+            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="نام داکتر" value={d.doctor} onChange={e => setD({...d, doctor: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 font-bold pr-2">تخصص داکتر</label>
+            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="تخصص (مثلاً متخصص داخله)" value={d.specialty} onChange={e => setD({...d, specialty: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 font-bold pr-2">شعار کلینیک / متن توضیحی</label>
+            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="شعار کلینیک" value={d.tagline} onChange={e => setD({...d, tagline: e.target.value})} />
+          </div>
         </div>
       </div>
 
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-        <h3 className="font-bold border-r-4 border-emerald-600 pr-2 text-emerald-700">انتخاب چاپ روی A5</h3>
+        <h3 className="font-bold border-r-4 border-amber-600 pr-2 text-amber-700 flex items-center gap-2">اطلاعات تماس <Phone className="w-4 h-4"/></h3>
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 font-bold pr-2">آدرس فزیکی</label>
+            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="آدرس کلینیک" value={d.address} onChange={e => setD({...d, address: e.target.value})} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] text-gray-400 font-bold pr-2">شماره‌های تماس</label>
+            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="شماره تماس" value={d.phone} onChange={e => setD({...d, phone: e.target.value})} />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
+        <h3 className="font-bold border-r-4 border-emerald-600 pr-2 text-emerald-700">انتخاب سایز چاپ</h3>
         <div className="flex gap-4">
           <button 
             onClick={() => setD({...d, printLayout: {...d.printLayout, pageSize: 'A4'}})}
