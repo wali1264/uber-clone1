@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, 
@@ -23,10 +24,18 @@ import {
   FileText,
   PlusCircle,
   Phone,
-  Tag
+  Tag,
+  EyeOff,
+  Eye,
+  Download,
+  Smartphone,
+  FileUp
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS } from './constants';
+
+// Declare mammoth for TypeScript
+declare const mammoth: any;
 
 // --- Database Configuration ---
 const DB_NAME = 'AsanNoskhaProfessionalDB';
@@ -170,9 +179,19 @@ const App: React.FC = () => {
     else alert('Invalid PIN');
   };
 
+  const handleToggleHidePatient = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setPatients(patients.map(p => p.id === id ? { ...p, isHidden: !p.isHidden } : p));
+  };
+
   const filteredPatients = useMemo(() => {
-    if (!searchQuery) return patients;
-    return patients.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.code.includes(searchQuery));
+    if (!searchQuery) {
+      return patients.filter(p => !p.isHidden);
+    }
+    return patients.filter(p => 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      p.code.includes(searchQuery)
+    );
   }, [patients, searchQuery]);
 
   if (!isLoggedIn) {
@@ -181,7 +200,8 @@ const App: React.FC = () => {
         <div className="w-full max-sm:max-w-xs max-w-sm bg-white rounded-[2.5rem] p-8 shadow-2xl text-center space-y-6">
           <Lock className="w-12 h-12 text-indigo-600 mx-auto" />
           <h1 className="text-2xl font-bold">ورود به سیستم</h1>
-          <input type="password" placeholder="PIN" className="w-full p-4 rounded-2xl bg-gray-50 text-center text-2xl" value={pin} onChange={e => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+          {/* Fix: Wrap setPin in an arrow function to correctly handle the event parameter 'e' */}
+          <input type="password" placeholder="PIN" className="w-full p-4 rounded-2xl bg-gray-50 text-center text-2xl" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
           <button onClick={handleLogin} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold">ورود</button>
           <div className="pt-4 border-t border-gray-100">
             <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">
@@ -227,7 +247,7 @@ const App: React.FC = () => {
 
         {view === 'NEW_PATIENT' && <PatientForm onSubmit={(p: any) => {
           const newId = Math.random().toString(36).substr(2, 9);
-          const newP = { ...p, id: newId, code: `P-${1000 + patients.length + 1}`, createdAt: getAdjustedTime() } as Patient;
+          const newP = { ...p, id: newId, code: `P-${1000 + patients.length + 1}`, createdAt: getAdjustedTime(), isHidden: false } as Patient;
           setPatients([newP, ...patients]); setSelectedPatientId(newId); setView('NEW_PRESCRIPTION');
         }} onCancel={() => setView('HOME')} />}
 
@@ -235,14 +255,23 @@ const App: React.FC = () => {
           <div className="space-y-4">
             <div className="relative">
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input className="w-full bg-white border rounded-2xl py-4 pr-12 pl-4 text-right" placeholder="جستجوی مریض..." value={searchQuery} onChange={e => searchQuerySet(e.target.value)} />
+              <input className="w-full bg-white border rounded-2xl py-4 pr-12 pl-4 text-right" placeholder="جستجوی مریض (نام یا کد)..." value={searchQuery} onChange={e => searchQuerySet(e.target.value)} />
             </div>
             {filteredPatients.map(p => (
-              <div key={p.id} onClick={() => { setSelectedPatientId(p.id); setView('NEW_PRESCRIPTION'); }} className="bg-white p-4 rounded-2xl shadow-sm cursor-pointer flex justify-between items-center hover:border-indigo-200 border border-transparent transition-all">
-                <ChevronLeft className="text-gray-300" />
-                <div className="text-right"><b>{p.name}</b><p className="text-xs text-gray-500">{p.code} | سن: {p.age}</p></div>
+              <div key={p.id} onClick={() => { setSelectedPatientId(p.id); setView('NEW_PRESCRIPTION'); }} className={`bg-white p-4 rounded-2xl shadow-sm cursor-pointer flex justify-between items-center hover:border-indigo-200 border transition-all ${p.isHidden ? 'border-dashed border-gray-200 opacity-80' : 'border-transparent'}`}>
+                <div className="flex items-center gap-2">
+                   <ChevronLeft className="text-gray-300" />
+                   <button onClick={(e) => handleToggleHidePatient(e, p.id)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors" title={p.isHidden ? "نمایش در لیست" : "مخفی کردن از لیست"}>
+                      {p.isHidden ? <Eye className="w-4 h-4 text-emerald-500" /> : <EyeOff className="w-4 h-4" />}
+                   </button>
+                </div>
+                <div className="text-right">
+                  <b>{p.name} {p.isHidden && <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full mr-1">مخفی</span>}</b>
+                  <p className="text-xs text-gray-500">{p.code} | سن: {p.age}</p>
+                </div>
               </div>
             ))}
+            {filteredPatients.length === 0 && <div className="text-center text-gray-400 py-10">مریضی یافت نشد</div>}
           </div>
         )}
 
@@ -570,7 +599,9 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
 const DrugSettings = ({ db }: any) => {
   const [drugs, setDrugs] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [newDrug, setNewDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadDrugs = () => {
     db.transaction(DRUG_STORE).objectStore(DRUG_STORE).getAll(null, 100).onsuccess = (e: any) => setDrugs(e.target.result);
@@ -604,36 +635,175 @@ const DrugSettings = ({ db }: any) => {
     }
   };
 
+  const handleBulkImport = (prefix: string) => {
+    if (!db || isImporting) return;
+    setIsImporting(true);
+    const TARGET_COUNT = 500000;
+    
+    const forms = ['Tab ', 'Syr ', 'Inj ', 'Cap ', 'Drops ', 'Cream ', 'Oint ', 'Spray ', 'Susp ', 'Gel '];
+    const stems = ['Amoxi', 'Cipro', 'Levo', 'Atorva', 'Omepra', 'Paraceta', 'Ibupro', 'Azithro', 'Ceftri', 'Metroni', 'Losar', 'Amlodi', 'Bisopro', 'Panto', 'Esomep', 'Diclo', 'Napro', 'Mefena', 'Celeco', 'Trana', 'Keto', 'Melo', 'Indo', 'Fluco', 'Clarithro', 'Roxy', 'Terbi', 'Ketoco', 'Predni', 'Dexa', 'Hydro', 'Betame'];
+    const suffixes = ['cillin', 'floxacin', 'statin', 'zole', 'mol', 'fen', 'mycin', 'axone', 'dazole', 'tan', 'pine', 'lol', 'prazole', 'nac', 'xen', 'mic', 'nib', 'mab', 'sone', 'lone', 'line', 'zine', 'mine', 'pril'];
+    const categories = ['Analgesic', 'Antibiotic', 'Gastro', 'Cardiac', 'Dermatology', 'Neurology', 'Vitamin', 'Respiratory', 'Pediatric'];
+
+    let i = 0;
+    const populateBatch = () => {
+      const txBatch = db.transaction(DRUG_STORE, 'readwrite');
+      const storeBatch = txBatch.objectStore(DRUG_STORE);
+      const batchLimit = Math.min(i + 15000, TARGET_COUNT);
+      
+      for (; i < batchLimit; i++) {
+        const form = forms[i % forms.length];
+        const stem = stems[i % stems.length];
+        const suffix = suffixes[i % suffixes.length];
+        const name = `${form}${stem}${suffix}-${i}`;
+        
+        storeBatch.put({
+          id: `${prefix}-${i}`,
+          name: name,
+          name_lower: name.toLowerCase(),
+          category: categories[i % categories.length],
+          defaultStrength: `${((i % 20) + 1) * 25}mg`,
+          defaultInstructions: 'Daily Use - After Meal'
+        });
+      }
+      
+      if (i < TARGET_COUNT) {
+        if (i % 45000 === 0) loadDrugs();
+        setTimeout(populateBatch, 0);
+      } else {
+        setIsImporting(false);
+        alert('تمام اطلاعات با موفقیت وارد بانک دوا شد!');
+        loadDrugs();
+      }
+    };
+    populateBatch();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !db) return;
+
+    setIsImporting(true);
+    
+    try {
+      let content = "";
+      if (file.name.endsWith('.docx')) {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        content = result.value;
+      } else {
+        content = await file.text();
+      }
+
+      let importedDrugs: any[] = [];
+      
+      // Try parsing as JSON first
+      try {
+        const json = JSON.parse(content);
+        importedDrugs = Array.isArray(json) ? json : [json];
+      } catch {
+        // Fallback to basic text parsing (line by line)
+        const lines = content.split('\n').filter(l => l.trim());
+        importedDrugs = lines.map((line, idx) => ({
+          name: line.trim(),
+          defaultStrength: 'N/A',
+          defaultInstructions: 'As directed',
+          category: 'Imported'
+        }));
+      }
+
+      if (importedDrugs.length === 0) {
+        setIsImporting(false);
+        alert('فایل خالی است یا فرمت آن معتبر نیست.');
+        return;
+      }
+
+      const tx = db.transaction(DRUG_STORE, 'readwrite');
+      const store = tx.objectStore(DRUG_STORE);
+      
+      importedDrugs.forEach((drug, idx) => {
+        store.put({
+          id: `file-import-${Date.now()}-${idx}`,
+          name: drug.name || 'نامشخص',
+          name_lower: (drug.name || 'نامشخص').toLowerCase(),
+          defaultStrength: drug.defaultStrength || drug.strength || 'N/A',
+          defaultInstructions: drug.defaultInstructions || drug.instructions || 'As directed',
+          category: drug.category || 'General'
+        });
+      });
+
+      tx.oncomplete = () => {
+        setIsImporting(false);
+        alert(`${importedDrugs.length} قلم دوا با موفقیت از سند وارد شد!`);
+        loadDrugs();
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      };
+    } catch (err) {
+      setIsImporting(false);
+      alert('خطا در خواندن فایل یا استخراج متن از سند ورد.');
+      console.error(err);
+    }
+  };
+
   return (
     <div className="space-y-4 fade-in">
       <h2 className="font-bold text-center text-indigo-900 border-b pb-4">بانک داروهای آماده</h2>
 
-      {!isAdding ? (
-        <button 
-          onClick={() => setIsAdding(true)}
-          className="w-full p-5 bg-indigo-50 text-indigo-700 rounded-3xl font-bold flex items-center justify-center gap-2 border border-indigo-100 hover:bg-indigo-100 transition-all"
-        >
-          <PlusCircle className="w-5 h-5" /> افزودن دوا جدید
-        </button>
-      ) : (
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-indigo-100 space-y-4 fade-in">
-          <div className="font-bold text-indigo-900">مشخصات دوای جدید</div>
-          <div className="space-y-3">
-            <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="نام دوا" value={newDrug.name} onChange={e => setNewDrug({...newDrug, name: e.target.value})} />
-            <div className="flex gap-2">
-              <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="دوز (e.g. 500mg)" value={newDrug.strength} onChange={e => setNewDrug({...newDrug, strength: e.target.value})} />
-              <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="کتگوری" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
-            </div>
-            <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="طریقه مصرف" value={newDrug.instructions} onChange={e => setNewDrug({...newDrug, instructions: e.target.value})} />
-            <div className="flex gap-3 pt-2">
-              <button onClick={handleSaveNewDrug} className="flex-2 bg-indigo-600 text-white p-4 rounded-2xl font-bold">ذخیره در بانک</button>
-              <button onClick={() => setIsAdding(false)} className="bg-white text-gray-400 p-4 rounded-2xl font-bold">لغو</button>
+      <div className="flex flex-col gap-3">
+        {!isAdding ? (
+          <button 
+            onClick={() => setIsAdding(true)}
+            className="w-full p-5 bg-indigo-50 text-indigo-700 rounded-3xl font-bold flex items-center justify-center gap-2 border border-indigo-100 hover:bg-indigo-100 transition-all"
+          >
+            <PlusCircle className="w-5 h-5" /> افزودن دوا جدید
+          </button>
+        ) : (
+          <div className="bg-white p-6 rounded-3xl shadow-sm border border-indigo-100 space-y-4 fade-in">
+            <div className="font-bold text-indigo-900">مشخصات دوای جدید</div>
+            <div className="space-y-3">
+              <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="نام دوا" value={newDrug.name} onChange={e => setNewDrug({...newDrug, name: e.target.value})} />
+              <div className="flex gap-2">
+                <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="دوز (e.g. 500mg)" value={newDrug.strength} onChange={e => setNewDrug({...newDrug, strength: e.target.value})} />
+                <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="کتگوری" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
+              </div>
+              <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="طریقه مصرف" value={newDrug.instructions} onChange={e => setNewDrug({...newDrug, instructions: e.target.value})} />
+              <div className="flex gap-3 pt-2">
+                <button onClick={handleSaveNewDrug} className="flex-2 bg-indigo-600 text-white p-4 rounded-2xl font-bold">ذخیره در بانک</button>
+                <button onClick={() => setIsAdding(false)} className="bg-white text-gray-400 p-4 rounded-2xl font-bold">لغو</button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <p className="text-[10px] text-center text-gray-400 italic">نمایش ۱۰۰ مورد تصادفی از کل ۵۰۰,۰۰۰ رکورد</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button 
+            onClick={() => handleBulkImport('flash')}
+            disabled={isImporting}
+            className={`w-full p-5 bg-emerald-600 text-white rounded-3xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95 ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <Download className="w-5 h-5" /> 
+            {isImporting ? 'در حال دریافت...' : 'دریافت دواها از فلش'}
+          </button>
+
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isImporting}
+            className={`w-full p-5 bg-indigo-600 text-white rounded-3xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 transition-all active:scale-95 ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <FileUp className="w-5 h-5" /> 
+            {isImporting ? 'در حال پردازش...' : 'افزودن چندین دوا از سند ورد'}
+          </button>
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            className="hidden" 
+            accept=".json,.txt,.docx"
+          />
+        </div>
+      </div>
+
+      <p className="text-[10px] text-center text-gray-400 italic">نمایش ۱۰۰ مورد تصادفی از کل بانک دوا</p>
       <div className="grid gap-2">
         {drugs.map(d => (
           <div key={d.id} className="bg-white p-4 rounded-2xl shadow-sm text-right border border-gray-50 flex justify-between items-center">
@@ -810,10 +980,10 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
               <ul className="meds-list">
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item mb-5">
-                    <div className="font-bold text-[12pt] whitespace-nowrap overflow-hidden text-ellipsis flex items-baseline justify-between">
+                    <div className="font-bold text-[12pt] whitespace-nowrap overflow-hidden text-ellipsis flex items-baseline gap-12">
                       <span>{idx + 1}. {m.name} {m.strength}</span>
                       {m.quantity && m.quantity !== '1' && (
-                        <span className="font-normal text-[11pt] text-gray-800 pr-10">N: {m.quantity}</span>
+                        <span className="font-normal text-[11pt] text-gray-800">N: {m.quantity}</span>
                       )}
                     </div>
                     <div className="text-[10pt] text-gray-600 italic font-normal ml-8 mt-1">

@@ -8,6 +8,7 @@ export interface Patient {
   age: string;
   gender: 'male' | 'female' | 'other';
   createdAt: number;
+  isHidden?: boolean;
 }
 
 export interface ClinicalRecords {
