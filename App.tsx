@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, 
@@ -29,7 +28,12 @@ import {
   Eye,
   Download,
   Smartphone,
-  FileUp
+  FileUp,
+  RefreshCcw,
+  Copy,
+  FolderHeart,
+  Star,
+  FolderEdit
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS } from './constants';
@@ -86,9 +90,12 @@ const App: React.FC = () => {
   const [view, setView] = useState<ViewState>('HOME');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [templatePrescriptions, setTemplatePrescriptions] = useState<Prescription[]>([]);
+  const [historyTab, setHistoryTab] = useState<'ALL' | 'TEMPLATES'>('ALL');
   const [clinicSettings, setClinicSettings] = useState<ClinicSettings>(DEFAULT_CLINIC_SETTINGS);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedPrescription, setSelectedPrescription] = useState<Prescription | null>(null);
+  const [draftPrescription, setDraftPrescription] = useState<Prescription | null>(null);
   const [searchQuery, searchQuerySet] = useState('');
   const [db, setDb] = useState<IDBDatabase | null>(null);
   const [isDbPopulating, setIsDbPopulating] = useState(false);
@@ -153,10 +160,12 @@ const App: React.FC = () => {
 
       const savedP = localStorage.getItem('patients');
       const savedPr = localStorage.getItem('prescriptions');
+      const savedT = localStorage.getItem('templatePrescriptions');
       const savedS = localStorage.getItem('clinicSettings');
       const savedPin = localStorage.getItem('doctorPin');
       if (savedP) setPatients(JSON.parse(savedP));
       if (savedPr) setPrescriptions(JSON.parse(savedPr));
+      if (savedT) setTemplatePrescriptions(JSON.parse(savedT));
       if (savedS) setClinicSettings(JSON.parse(savedS));
       if (savedPin) setStoredPin(savedPin);
       if (sessionStorage.getItem('isLoggedIn') === 'true') setIsLoggedIn(true);
@@ -170,9 +179,10 @@ const App: React.FC = () => {
     if (!isDataLoaded) return;
     localStorage.setItem('patients', JSON.stringify(patients));
     localStorage.setItem('prescriptions', JSON.stringify(prescriptions));
+    localStorage.setItem('templatePrescriptions', JSON.stringify(templatePrescriptions));
     localStorage.setItem('clinicSettings', JSON.stringify(clinicSettings));
     localStorage.setItem('doctorPin', storedPin);
-  }, [patients, prescriptions, clinicSettings, storedPin, isDataLoaded]);
+  }, [patients, prescriptions, templatePrescriptions, clinicSettings, storedPin, isDataLoaded]);
 
   const handleLogin = () => {
     if (pin === storedPin) { setIsLoggedIn(true); sessionStorage.setItem('isLoggedIn', 'true'); }
@@ -182,6 +192,27 @@ const App: React.FC = () => {
   const handleToggleHidePatient = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setPatients(patients.map(p => p.id === id ? { ...p, isHidden: !p.isHidden } : p));
+  };
+
+  const handleSaveToTemplates = (pr: Prescription) => {
+    // Check for duplicates based on content (diagnosis and medications)
+    const isDuplicate = templatePrescriptions.some(t => 
+      t.diagnosis === pr.diagnosis && 
+      JSON.stringify(t.medications) === JSON.stringify(pr.medications)
+    );
+
+    if (isDuplicate) {
+      alert('این نسخه با همین مشخصات قبلاً در پوشه نسخه‌های قابل ویرایش موجود است.');
+      return;
+    }
+
+    const newTmpl = { ...pr, id: `tmpl-${pr.id}`, date: getAdjustedTime() };
+    setTemplatePrescriptions([newTmpl, ...templatePrescriptions]);
+    alert('نسخه با موفقیت به پوشه نسخه‌های قابل ویرایش اضافه شد.');
+  };
+
+  const handleRemoveTemplate = (id: string) => {
+    setTemplatePrescriptions(templatePrescriptions.filter(t => t.id !== id));
   };
 
   const filteredPatients = useMemo(() => {
@@ -198,9 +229,9 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 p-6">
         <div className="w-full max-sm:max-w-xs max-w-sm bg-white rounded-[2.5rem] p-8 shadow-2xl text-center space-y-6">
+          <div className="text-4xl font-black text-indigo-900 mb-2">معراج</div>
           <Lock className="w-12 h-12 text-indigo-600 mx-auto" />
           <h1 className="text-2xl font-bold">ورود به سیستم</h1>
-          {/* Fix: Wrap setPin in an arrow function to correctly handle the event parameter 'e' */}
           <input type="password" placeholder="PIN" className="w-full p-4 rounded-2xl bg-gray-50 text-center text-2xl" value={pin} onChange={(e) => setPin(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()} />
           <button onClick={handleLogin} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold">ورود</button>
           <div className="pt-4 border-t border-gray-100">
@@ -235,11 +266,12 @@ const App: React.FC = () => {
             <div className="bg-gradient-to-br from-indigo-800 to-blue-900 rounded-[2.5rem] p-8 text-white shadow-xl">
               <h2 className="text-2xl font-bold">خوش آمدید!</h2>
               <div className="mt-8 flex gap-3">
-                <button onClick={() => setView('NEW_PATIENT')} className="flex-1 bg-white/10 p-5 rounded-[2rem] flex flex-col items-center gap-2 hover:bg-white/20 transition-all"><UserPlus /><span>مریض جدید</span></button>
-                <button onClick={() => setView('PATIENTS')} className="flex-1 bg-white/10 p-5 rounded-[2rem] flex flex-col items-center gap-2 hover:bg-white/20 transition-all"><Users /><span>لیست مریضان</span></button>
+                <button onClick={() => { setDraftPrescription(null); setView('NEW_PATIENT'); }} className="flex-1 bg-white/10 p-5 rounded-[2rem] flex flex-col items-center gap-2 hover:bg-white/20 transition-all"><UserPlus /><span>مریض جدید</span></button>
+                <button onClick={() => { setDraftPrescription(null); setView('PATIENTS'); }} className="flex-1 bg-white/10 p-5 rounded-[2rem] flex flex-col items-center gap-2 hover:bg-white/20 transition-all"><Users /><span>لیست مریضان</span></button>
               </div>
             </div>
-            <QuickAction icon={<History />} title="آرشیف نسخه‌ها" onClick={() => setView('PRESCRIPTION_HISTORY')} />
+            <QuickAction icon={<History />} title="آرشیف نسخه‌ها" onClick={() => { setHistoryTab('ALL'); setView('PRESCRIPTION_HISTORY'); }} />
+            <QuickAction icon={<FolderEdit className="text-emerald-500" />} title="پوشه نسخه‌های قابل ویرایش" onClick={() => { setHistoryTab('TEMPLATES'); setView('PRESCRIPTION_HISTORY'); }} />
             <QuickAction icon={<Database />} title="بانک دواها" onClick={() => setView('DRUGS')} />
             <QuickAction icon={<Settings />} title="تنظیمات" onClick={() => setView('SETTINGS')} />
           </div>
@@ -257,6 +289,12 @@ const App: React.FC = () => {
               <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input className="w-full bg-white border rounded-2xl py-4 pr-12 pl-4 text-right" placeholder="جستجوی مریض (نام یا کد)..." value={searchQuery} onChange={e => searchQuerySet(e.target.value)} />
             </div>
+            {draftPrescription && (
+              <div className="bg-emerald-50 text-emerald-700 p-4 rounded-2xl text-xs font-bold border border-emerald-100 flex items-center justify-between">
+                <span>مریض را برای استفاده از نسخه الگو انتخاب کنید</span>
+                <button onClick={() => setDraftPrescription(null)} className="p-1 hover:bg-emerald-100 rounded-full"><X className="w-4 h-4" /></button>
+              </div>
+            )}
             {filteredPatients.map(p => (
               <div key={p.id} onClick={() => { setSelectedPatientId(p.id); setView('NEW_PRESCRIPTION'); }} className={`bg-white p-4 rounded-2xl shadow-sm cursor-pointer flex justify-between items-center hover:border-indigo-200 border transition-all ${p.isHidden ? 'border-dashed border-gray-200 opacity-80' : 'border-transparent'}`}>
                 <div className="flex items-center gap-2">
@@ -278,27 +316,80 @@ const App: React.FC = () => {
         {view === 'NEW_PRESCRIPTION' && selectedPatientId && db && (
           <PrescriptionForm 
             db={db} patient={patients.find(p => p.id === selectedPatientId)!}
+            initialData={draftPrescription}
             onSubmit={(pr: any) => {
               const newPr = { ...pr, id: Math.random().toString(36).substr(2, 9), date: getAdjustedTime() };
-              setPrescriptions([newPr, ...prescriptions]); setSelectedPrescription(newPr); setView('VIEW_PDF');
+              setPrescriptions([newPr, ...prescriptions]); setSelectedPrescription(newPr); setDraftPrescription(null); setView('VIEW_PDF');
             }}
           />
         )}
 
         {view === 'PRESCRIPTION_HISTORY' && (
           <div className="space-y-4">
-            {prescriptions.map(pr => {
-              const p = patients.find(x => x.id === pr.patientId);
-              return (
-                <div key={pr.id} onClick={() => { setSelectedPrescription(pr); setView('VIEW_PDF'); }} className="bg-white p-5 rounded-2xl shadow-sm cursor-pointer text-right hover:border-indigo-200 border border-transparent">
-                  <div className="flex justify-between">
-                    <span className="text-xs text-gray-400">{new Date(pr.date).toLocaleDateString()}</span>
-                    <b className="font-bold">{p?.name}</b>
-                  </div>
-                  <div className="text-sm text-indigo-600 mt-1">{pr.diagnosis}</div>
+            <div className="flex bg-gray-100 p-1.5 rounded-2xl mb-2 no-print">
+               <button onClick={() => setHistoryTab('ALL')} className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all ${historyTab === 'ALL' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500'}`}>تاریخچه نسخه‌ها</button>
+               <button onClick={() => setHistoryTab('TEMPLATES')} className={`flex-1 py-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${historyTab === 'TEMPLATES' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500'}`}><FolderEdit className="w-4 h-4" /> پوشه الگوها</button>
+            </div>
+
+            {historyTab === 'ALL' ? (
+              <div className="space-y-3">
+                {prescriptions.map(pr => {
+                  const p = patients.find(x => x.id === pr.patientId);
+                  return (
+                    <div key={pr.id} className="bg-white p-4 rounded-2xl shadow-sm text-right border border-transparent hover:border-indigo-100 transition-all">
+                      <div className="flex justify-between items-start">
+                        <div className="flex gap-2">
+                           <button onClick={() => { setSelectedPrescription(pr); setView('VIEW_PDF'); }} className="p-2.5 bg-gray-50 text-gray-500 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="مشاهده"><Eye className="w-4 h-4" /></button>
+                           <button onClick={() => handleSaveToTemplates(pr)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all" title="افزودن به پوشه الگوها"><Star className="w-4 h-4" /></button>
+                           <button onClick={() => { setDraftPrescription(pr); setView('PATIENTS'); }} className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-colors flex items-center gap-1" title="استفاده مجدد"><Copy className="w-4 h-4" /><span className="text-[10px] font-bold">تکرار</span></button>
+                        </div>
+                        <div className="flex-1 pr-4">
+                          <div className="flex justify-between">
+                            <span className="text-[10px] text-gray-400">{new Date(pr.date).toLocaleDateString('fa-AF')}</span>
+                            <b className="font-bold">{p?.name}</b>
+                          </div>
+                          <div className="text-xs text-indigo-600 mt-1">{pr.diagnosis || 'بدون تشخیص'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {prescriptions.length === 0 && <div className="text-center text-gray-400 py-20">هیچ نسخه‌ای یافت نشد</div>}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-[10px] text-indigo-500 font-bold pr-2 flex items-center gap-2">
+                  <FolderHeart className="w-3 h-3" /> نسخه‌های پرکاربرد ذخیره شده جهت استفاده سریع
                 </div>
-              );
-            })}
+                {templatePrescriptions.map(pr => (
+                  <div key={pr.id} className="bg-white p-5 rounded-3xl shadow-sm text-right border-2 border-indigo-100/30 hover:border-indigo-500 transition-all group">
+                    <div className="flex justify-between items-start">
+                      <div className="flex gap-2">
+                         <button onClick={() => handleRemoveTemplate(pr.id)} className="p-2.5 text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                         <button onClick={() => { setDraftPrescription(pr); setView('PATIENTS'); }} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md active:scale-95 flex items-center gap-2 font-bold text-xs"><PlusCircle className="w-4 h-4" /> استفاده از این الگو</button>
+                      </div>
+                      <div className="flex-1 pr-4">
+                        <b className="text-indigo-900 block">{pr.diagnosis || 'نسخه آماده'}</b>
+                        <div className="text-[10px] text-gray-400 mt-1">{pr.medications.length} قلم دوا در این الگو موجود است</div>
+                        <div className="mt-2 flex flex-wrap gap-1 justify-end">
+                          {pr.medications.slice(0, 3).map((m, idx) => (
+                            <span key={idx} className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[8px]">{m.name}</span>
+                          ))}
+                          {pr.medications.length > 3 && <span className="text-[8px] text-gray-300">...</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {templatePrescriptions.length === 0 && (
+                  <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100">
+                    <FolderEdit className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                    <p className="text-gray-400 text-sm">پوشه الگوهای شما خالی است</p>
+                    <button onClick={() => setHistoryTab('ALL')} className="mt-4 text-indigo-600 text-xs font-bold underline">افزودن از تاریخچه نسخه‌ها</button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -316,9 +407,9 @@ const App: React.FC = () => {
       </main>
 
       <nav className="bg-white border-t fixed bottom-0 left-0 right-0 max-w-lg mx-auto flex justify-around p-4 no-print rounded-t-3xl shadow-lg">
-        <NavBtn icon={<Home />} label="اصلی" onClick={() => setView('HOME')} />
-        <NavBtn icon={<Users />} label="مریضان" onClick={() => setView('PATIENTS')} />
-        <NavBtn icon={<Settings />} label="تنظیمات" onClick={() => setView('SETTINGS')} />
+        <NavBtn icon={<Home />} label="اصلی" onClick={() => { setDraftPrescription(null); setView('HOME'); }} />
+        <NavBtn icon={<Users />} label="مریضان" onClick={() => { setDraftPrescription(null); setView('PATIENTS'); }} />
+        <NavBtn icon={<Settings />} label="تنظیمات" onClick={() => { setDraftPrescription(null); setView('SETTINGS'); }} />
       </nav>
     </div>
   );
@@ -363,11 +454,11 @@ const PatientForm = ({ onSubmit, onCancel }: any) => {
   );
 };
 
-const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
-  const [cc, setCc] = useState('');
-  const [diag, setDiag] = useState('');
-  const [meds, setMeds] = useState<any[]>([]);
-  const [vitals, setVitals] = useState({ bp: '', hr: '', pr: '', spo2: '', temp: '', wt: '' });
+const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
+  const [cc, setCc] = useState(initialData?.cc || '');
+  const [diag, setDiag] = useState(initialData?.diagnosis || '');
+  const [meds, setMeds] = useState<any[]>(initialData?.medications || []);
+  const [vitals, setVitals] = useState(initialData?.clinicalRecords || { bp: '', hr: '', pr: '', spo2: '', temp: '', wt: '' });
   const [search, setSearch] = useState('');
   const [drugResults, setDrugResults] = useState<any[]>([]);
   const [isAddingManual, setIsAddingManual] = useState(false);
@@ -469,12 +560,13 @@ const PrescriptionForm = ({ patient, db, onSubmit }: any) => {
       <div className="bg-slate-900 p-6 rounded-[2rem] text-white text-right shadow-xl">
         <div className="font-bold text-xl">{patient.name}</div>
         <div className="text-xs text-indigo-400 mt-1 uppercase tracking-wider">سن: {patient.age} | کود: {patient.code}</div>
+        {initialData && <div className="mt-2 inline-block px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded-lg text-[10px] font-bold">تکرار نسخه از الگو</div>}
       </div>
 
       <div className="bg-white p-5 rounded-[2rem] shadow-sm grid grid-cols-3 gap-2 border border-gray-100">
         {Object.keys(vitals).map(k => (
           <div key={k} className="relative">
-            <input placeholder={k.toUpperCase()} className="w-full p-2.5 bg-gray-50 rounded-xl text-center text-xs outline-none focus:ring-1 focus:ring-indigo-300 transition-all" onChange={e => setVitals({...vitals, [k]: (e.target as HTMLInputElement).value})} />
+            <input placeholder={k.toUpperCase()} className="w-full p-2.5 bg-gray-50 rounded-xl text-center text-xs outline-none focus:ring-1 focus:ring-indigo-300 transition-all" value={vitals[k as keyof typeof vitals]} onChange={e => setVitals({...vitals, [k]: (e.target as HTMLInputElement).value})} />
           </div>
         ))}
       </div>
@@ -859,7 +951,7 @@ const ClinicSettingsForm = ({ settings, onSave, storedPin, onSavePin, onBack }: 
       </div>
 
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-        <h3 className="font-bold border-r-4 border-amber-600 pr-2 text-amber-700 flex items-center gap-2">اطلاعات تماس <Phone className="w-4 h-4"/></h3>
+        <h3 className="font-bold border-r-4 border-amber-600 pr-2 text-amber-700 flex items-center gap-2">اطلاوات تماس <Phone className="w-4 h-4"/></h3>
         <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-[10px] text-gray-400 font-bold pr-2">آدرس فزیکی</label>
