@@ -1026,7 +1026,7 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
           <div className="rx-header">
             <div className="h-[4cm] w-full"></div>
             
-            <div className="flex justify-between items-baseline pb-2 mb-2 text-[11pt] font-bold mt-8" style={{ direction: 'ltr' }}>
+            <div className={`flex justify-between items-baseline pb-2 mb-2 text-[11pt] font-bold ${settings.printLayout.pageSize === 'A5' ? 'mt-4' : 'mt-8'}`} style={{ direction: 'ltr' }}>
               <div className="flex gap-20 pl-8">
                 <span>Name: {patient.name}</span>
                 <span>Age: {patient.age}</span>
@@ -1060,7 +1060,7 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
                 </div>
               </div>
               
-              <div className="mt-auto space-y-4">
+              <div className="mt-auto space-y-4 mb-12">
                 <div className="flex flex-col items-center">
                   <div className="text-[7pt] text-gray-400">CODE</div>
                   <div className="font-bold text-[9pt]">{patient.code}</div>
@@ -1069,10 +1069,10 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
             </div>
 
             <div className="rx-main">
-              <ul className="meds-list">
+              <ul className="meds-list" style={{ marginTop: settings.printLayout.pageSize === 'A4' ? '0mm' : '5.5mm' }}>
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item mb-5">
-                    <div className="font-bold text-[12pt] whitespace-nowrap overflow-hidden text-ellipsis flex items-baseline gap-12">
+                    <div className={`font-bold text-[12pt] whitespace-nowrap overflow-hidden text-ellipsis flex items-baseline ${settings.printLayout.pageSize === 'A4' ? 'gap-32' : 'gap-12'}`}>
                       <span>{idx + 1}. {m.name} {m.strength}</span>
                       {m.quantity && m.quantity !== '1' && (
                         <span className="font-normal text-[11pt] text-gray-800">N: {m.quantity}</span>
