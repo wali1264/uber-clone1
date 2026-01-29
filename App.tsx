@@ -462,6 +462,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const [search, setSearch] = useState('');
   const [drugResults, setDrugResults] = useState<any[]>([]);
   const [isAddingManual, setIsAddingManual] = useState(false);
+  const [showCustomOnly, setShowCustomOnly] = useState(false);
   const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -469,12 +470,30 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     if (!db) return;
     const tx = db.transaction(DRUG_STORE, 'readonly');
     const store = tx.objectStore(DRUG_STORE);
+    const results: any[] = [];
+    const searchLower = search.toLowerCase();
+
+    if (showCustomOnly) {
+      const request = store.openCursor(null, 'prev');
+      request.onsuccess = (e: any) => {
+        const cursor = e.target.result;
+        if (cursor && results.length < 50) {
+          const d = cursor.value;
+          const isCustom = d.id.startsWith('custom-') || d.id.startsWith('man-') || d.id.startsWith('file-import-');
+          const matchesName = !searchLower || d.name_lower.includes(searchLower);
+          if (isCustom && matchesName) {
+            results.push(d);
+          }
+          cursor.continue();
+        } else {
+          setDrugResults(results);
+        }
+      };
+      return;
+    }
     
     // Using name_lower index for instant first-letter search
     const index = store.index('name_lower');
-    const results: any[] = [];
-    const searchLower = search.toLowerCase();
-    
     if (!searchLower) {
       setDrugResults([]);
       return;
@@ -492,7 +511,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
         setDrugResults(results);
       }
     };
-  }, [search, db, refreshTrigger]);
+  }, [search, db, refreshTrigger, showCustomOnly]);
 
   const toggleCC = (item: string) => {
     setCc(prev => {
@@ -596,12 +615,67 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
       </div>
 
       <div className="bg-white p-6 rounded-[2.5rem] shadow-sm space-y-4 text-right border border-gray-100">
-        <div className="flex justify-between items-center border-b pb-3 mb-2">
-          <div className="relative flex-1 max-w-[200px]">
-            <Search className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <input className="text-xs w-full py-2 pr-7 pl-2 border rounded-xl outline-none focus:ring-1 focus:ring-indigo-300" placeholder="Search drugs..." value={search} onChange={e => setSearch(e.target.value)} />
+        <div className="flex flex-col border-b pb-3 mb-2 gap-3">
+          <div className="flex justify-between items-center">
+            <h3 className="font-bold text-indigo-700 flex items-center gap-2">دواهای تجویزی <Database className="w-4 h-4" /></h3>
+            <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
+              <button 
+                onClick={() => {
+                  setShowCustomOnly(false);
+                  setSearch('Tab ');
+                  setTimeout(() => document.getElementById('drug-search-input')?.focus(), 0);
+                }} 
+                className="whitespace-nowrap px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
+              >
+                سرچ تابلیت
+              </button>
+              <button 
+                onClick={() => {
+                  setShowCustomOnly(false);
+                  setSearch('Cap ');
+                  setTimeout(() => document.getElementById('drug-search-input')?.focus(), 0);
+                }} 
+                className="whitespace-nowrap px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[9px] font-bold border border-amber-100 hover:bg-amber-100 transition-colors"
+              >
+                سرچ کپسول
+              </button>
+              <button 
+                onClick={() => {
+                  setShowCustomOnly(false);
+                  setSearch('Syp ');
+                  setTimeout(() => document.getElementById('drug-search-input')?.focus(), 0);
+                }} 
+                className="whitespace-nowrap px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
+              >
+                سرچ شربت
+              </button>
+              <button 
+                onClick={() => {
+                  setIsAddingManual(true);
+                  setShowCustomOnly(false);
+                }} 
+                className="whitespace-nowrap px-2.5 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-[9px] font-bold border border-rose-100 hover:bg-rose-100 transition-colors"
+              >
+                افزودن دارو خود ما
+              </button>
+              <button 
+                onClick={() => setShowCustomOnly(!showCustomOnly)} 
+                className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${showCustomOnly ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'}`}
+              >
+                انتخاب دارو خود ما
+              </button>
+            </div>
           </div>
-          <h3 className="font-bold text-indigo-700 flex items-center gap-2">دواهای تجویزی <Database className="w-4 h-4" /></h3>
+          <div className="relative w-full">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input 
+              id="drug-search-input"
+              className="text-sm w-full py-3 pr-10 pl-3 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100" 
+              placeholder={showCustomOnly ? "جستجو در داروهای شخصی شما..." : "جستجوی دوا..."} 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
+            />
+          </div>
         </div>
 
         {!isAddingManual ? (
@@ -880,7 +954,7 @@ const DrugSettings = ({ db }: any) => {
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
-            className={`w-full p-5 bg-indigo-600 text-white rounded-3xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-100 transition-all active:scale-95 ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}
+            className={`w-full p-5 bg-indigo-600 text-white rounded-3xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95 ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <FileUp className="w-5 h-5" /> 
             {isImporting ? 'در حال پردازش...' : 'افزودن چندین دوا از سند ورد'}
@@ -1024,7 +1098,7 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
           minHeight: settings.printLayout.pageSize === 'A5' ? '210mm' : '297mm' 
         }}>
           <div className="rx-header">
-            <div className="h-[4cm] w-full"></div>
+            <div className={`${settings.printLayout.pageSize === 'A5' ? 'h-[2.5cm]' : 'h-[4cm]'} w-full`}></div>
             
             <div className={`flex justify-between items-baseline pb-2 mb-2 text-[11pt] font-bold ${settings.printLayout.pageSize === 'A5' ? 'mt-4' : 'mt-8'}`} style={{ direction: 'ltr' }}>
               <div className="flex gap-20 pl-8">
@@ -1060,7 +1134,7 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
                 </div>
               </div>
               
-              <div className="mt-auto space-y-4 mb-12">
+              <div className={`${settings.printLayout.pageSize === 'A5' ? 'mt-40' : 'mt-auto'} space-y-4 mb-12`}>
                 <div className="flex flex-col items-center">
                   <div className="text-[7pt] text-gray-400">CODE</div>
                   <div className="font-bold text-[9pt]">{patient.code}</div>
@@ -1069,7 +1143,7 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
             </div>
 
             <div className="rx-main">
-              <ul className="meds-list" style={{ marginTop: settings.printLayout.pageSize === 'A4' ? '0mm' : '5.5mm' }}>
+              <ul className="meds-list" style={{ marginTop: settings.printLayout.pageSize === 'A4' ? '0mm' : '0mm' }}>
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item mb-5">
                     <div className={`font-bold text-[12pt] whitespace-nowrap overflow-hidden text-ellipsis flex items-baseline ${settings.printLayout.pageSize === 'A4' ? 'gap-32' : 'gap-12'}`}>
