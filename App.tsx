@@ -465,53 +465,71 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const [showCustomOnly, setShowCustomOnly] = useState(false);
   const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  
+  // High-performance cache for custom drugs (doctor's own items)
+  const [allCustomDrugs, setAllCustomDrugs] = useState<any[]>([]);
 
+  // Pre-load custom drugs for instant searching without scanning 500k generic items
   useEffect(() => {
     if (!db) return;
     const tx = db.transaction(DRUG_STORE, 'readonly');
     const store = tx.objectStore(DRUG_STORE);
     const results: any[] = [];
+    const prefixes = ['custom-', 'man-', 'file-import-'];
+    let completed = 0;
+    
+    prefixes.forEach(pref => {
+      const range = IDBKeyRange.bound(pref, pref + '\uffff');
+      store.openCursor(range).onsuccess = (e: any) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          results.push(cursor.value);
+          cursor.continue();
+        } else {
+          completed++;
+          if (completed === prefixes.length) {
+            setAllCustomDrugs(results);
+          }
+        }
+      };
+    });
+  }, [db, refreshTrigger]);
+
+  useEffect(() => {
+    if (!db) return;
     const searchLower = search.toLowerCase();
 
+    // OPTIMIZED SEARCH: For custom drugs, use the pre-loaded memory cache for instant response
     if (showCustomOnly) {
-      const request = store.openCursor(null, 'prev');
-      request.onsuccess = (e: any) => {
+      const filtered = allCustomDrugs
+        .filter(d => !searchLower || d.name_lower.includes(searchLower))
+        .sort((a, b) => b.id.localeCompare(a.id)) // Newest first
+        .slice(0, 50);
+      setDrugResults(filtered);
+      return;
+    }
+
+    // Generic search for the 500k item library (only when searching all)
+    const tx = db.transaction(DRUG_STORE, 'readonly');
+    const store = tx.objectStore(DRUG_STORE);
+    const index = store.index('name_lower');
+    const results: any[] = [];
+    
+    if (searchLower) {
+      const range = IDBKeyRange.bound(searchLower, searchLower + '\uffff');
+      index.openCursor(range).onsuccess = (e: any) => {
         const cursor = e.target.result;
-        if (cursor && results.length < 50) {
-          const d = cursor.value;
-          const isCustom = d.id.startsWith('custom-') || d.id.startsWith('man-') || d.id.startsWith('file-import-');
-          const matchesName = !searchLower || d.name_lower.includes(searchLower);
-          if (isCustom && matchesName) {
-            results.push(d);
-          }
+        if (cursor && results.length < 50) { 
+          results.push(cursor.value);
           cursor.continue();
         } else {
           setDrugResults(results);
         }
       };
-      return;
-    }
-    
-    // Using name_lower index for instant first-letter search
-    const index = store.index('name_lower');
-    if (!searchLower) {
+    } else {
       setDrugResults([]);
-      return;
     }
-
-    const range = IDBKeyRange.bound(searchLower, searchLower + '\uffff');
-    const request = index.openCursor(range);
-    
-    request.onsuccess = (e: any) => {
-      const cursor = e.target.result;
-      if (cursor && results.length < 50) { 
-        results.push(cursor.value);
-        cursor.continue();
-      } else {
-        setDrugResults(results);
-      }
-    };
-  }, [search, db, refreshTrigger, showCustomOnly]);
+  }, [search, db, refreshTrigger, showCustomOnly, allCustomDrugs]);
 
   const toggleCC = (item: string) => {
     setCc(prev => {
@@ -539,7 +557,6 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     if (!manualDrug.name) return;
     const newId = `custom-${Date.now()}`;
     
-    // Map to DB structure for permanent storage
     const drugData = { 
       id: newId,
       name: manualDrug.name,
@@ -549,14 +566,12 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
       category: manualDrug.category
     };
     
-    // Save to DB permanently
     try {
       const tx = db.transaction(DRUG_STORE, 'readwrite');
       const store = tx.objectStore(DRUG_STORE);
       const putReq = store.put(drugData);
       
       putReq.onsuccess = () => {
-        // Add to current meds list
         setMeds([...meds, { ...drugData, strength: manualDrug.strength, quantity: '1', instructions: manualDrug.instructions }]);
         setIsAddingManual(false);
         setManualDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
@@ -863,12 +878,10 @@ const DrugSettings = ({ db }: any) => {
 
       let importedDrugs: any[] = [];
       
-      // Try parsing as JSON first
       try {
         const json = JSON.parse(content);
         importedDrugs = Array.isArray(json) ? json : [json];
       } catch {
-        // Fallback to basic text parsing (line by line)
         const lines = content.split('\n').filter(l => l.trim());
         importedDrugs = lines.map((line, idx) => ({
           name: line.trim(),
