@@ -118,6 +118,7 @@ const App: React.FC = () => {
           
           if (currentCount < TARGET_COUNT) {
             setIsDbPopulating(true);
+            // Put initial drugs first
             INITIAL_DRUGS.forEach(d => store.put({ ...d, name_lower: d.name.toLowerCase() }));
             
             const forms = ['Tab ', 'Syr ', 'Inj ', 'Cap ', 'Drops ', 'Cream ', 'Oint ', 'Spray ', 'Susp ', 'Gel '];
@@ -129,7 +130,7 @@ const App: React.FC = () => {
             const populateBatch = () => {
               const txBatch = database.transaction(DRUG_STORE, 'readwrite');
               const storeBatch = txBatch.objectStore(DRUG_STORE);
-              const batchLimit = Math.min(i + 15000, TARGET_COUNT);
+              const batchLimit = Math.min(i + 5000, TARGET_COUNT); 
               
               for (; i < batchLimit; i++) {
                 const form = forms[i % forms.length];
@@ -148,7 +149,7 @@ const App: React.FC = () => {
               }
               
               if (i < TARGET_COUNT) {
-                setTimeout(populateBatch, 0);
+                setTimeout(populateBatch, 10);
               } else {
                 setIsDbPopulating(false);
               }
@@ -465,13 +466,14 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  const [allCustomDrugs, setAllCustomDrugs] = useState<any[]>([]);
+  // High-performance cache for custom drugs (doctor's own items)
+  const [allCustomDrugs, setAllCustomDrugs] = useState<any[]>(INITIAL_DRUGS);
 
   useEffect(() => {
     if (!db) return;
     const tx = db.transaction(DRUG_STORE, 'readonly');
     const store = tx.objectStore(DRUG_STORE);
-    const results: any[] = [];
+    const results: any[] = [...INITIAL_DRUGS];
     const prefixes = ['custom-', 'man-', 'file-import-'];
     let completed = 0;
     
@@ -480,7 +482,9 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
       store.openCursor(range).onsuccess = (e: any) => {
         const cursor = e.target.result;
         if (cursor) {
-          results.push(cursor.value);
+          if (!results.find(r => r.id === cursor.value.id)) {
+            results.push(cursor.value);
+          }
           cursor.continue();
         } else {
           completed++;
@@ -492,16 +496,24 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     });
   }, [db, refreshTrigger]);
 
+  const filteredCustomDrugs = useMemo(() => {
+    const searchLower = search.toLowerCase();
+    return allCustomDrugs
+      .filter(d => !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower)))
+      .sort((a, b) => {
+        if (a.id.startsWith('custom') && !b.id.startsWith('custom')) return -1;
+        if (b.id.startsWith('custom') && !a.id.startsWith('custom')) return 1;
+        return b.id.localeCompare(a.id);
+      })
+      .slice(0, 50);
+  }, [allCustomDrugs, search]);
+
   useEffect(() => {
     if (!db) return;
     const searchLower = search.toLowerCase();
 
     if (showCustomOnly) {
-      const filtered = allCustomDrugs
-        .filter(d => !searchLower || d.name_lower.includes(searchLower))
-        .sort((a, b) => b.id.localeCompare(a.id))
-        .slice(0, 50);
-      setDrugResults(filtered);
+      setDrugResults(filteredCustomDrugs);
       return;
     }
 
@@ -524,7 +536,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     } else {
       setDrugResults([]);
     }
-  }, [search, db, refreshTrigger, showCustomOnly, allCustomDrugs]);
+  }, [search, db, refreshTrigger, showCustomOnly, filteredCustomDrugs]);
 
   const toggleCC = (item: string) => {
     setCc(prev => {
@@ -808,8 +820,17 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
                 <div>Wt: {prescription.clinicalRecords.wt || '-'}</div>
                 <div className="pt-3 font-bold">Chief Complain</div>
                 <div className="pl-1">{prescription.cc || '-'}</div>
-                <div className="pt-14 font-bold">Diagnosis</div>
-                <div className="text-center w-full px-1">{prescription.diagnosis || '-'}</div>
+                {settings.printLayout.pageSize === 'A4' ? (
+                  <div className="pt-24 flex flex-col items-start w-full">
+                    <div className="font-bold">Diagnosis</div>
+                    <div className="text-left w-full px-1 pt-1">{prescription.diagnosis || '-'}</div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="pt-14 font-bold">Diagnosis</div>
+                    <div className="text-center w-full px-1">{prescription.diagnosis || '-'}</div>
+                  </>
+                )}
               </div>
               <div className={`${settings.printLayout.pageSize === 'A5' ? 'mt-40' : 'mt-auto'} mb-12`}>
                 <div className="text-[7pt] text-gray-400">CODE</div>
@@ -817,12 +838,16 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
               </div>
             </div>
             <div className="rx-main">
-              <ul className="meds-list">
+              <ul className="meds-list" style={{ marginTop: settings.printLayout.pageSize === 'A5' ? '0' : '10mm' }}>
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item mb-5">
                     <div className="font-bold text-[12pt] flex items-baseline gap-12">
                       <span>{idx + 1}. {m.name} {m.strength}</span>
-                      {m.quantity && m.quantity !== '1' && <span className="font-normal text-[11pt]">N: {m.quantity}</span>}
+                      {m.quantity && m.quantity !== '1' && (
+                        <span className="font-normal text-[11pt]">
+                          {settings.printLayout.pageSize === 'A4' ? `N ${m.quantity}` : `N: ${m.quantity}`}
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10pt] text-gray-600 italic ml-8 mt-1">-- {m.instructions}</div>
                   </li>

@@ -152,7 +152,7 @@ export const INITIAL_DRUGS: DrugTemplate[] = [
   { id: 'man-149', name: 'Syp Azetromycin', defaultStrength: '200mg', defaultInstructions: 'As directed', category: 'Syrup' },
   { id: 'man-150', name: 'Syp Ciprofloxacine', defaultStrength: '125mg', defaultInstructions: 'As directed', category: 'Syrup' },
   { id: 'man-151', name: 'Cap dexlansoprazole', defaultStrength: '60mg', defaultInstructions: 'As directed', category: 'Capsule' },
-  { id: 'man-152', name: 'Tab cefixim', defaultStrength: '400 iran', defaultInstructions: 'As directed', category: 'Tablet' },
+  { id: 'man-152', name: 'Tab cefixim', defaultStrength: '400mg', defaultInstructions: 'As directed', category: 'Tablet' },
   { id: 'man-153', name: 'Syp Metodine Df', defaultStrength: 'N/A', defaultInstructions: 'As directed', category: 'Syrup' },
   { id: 'man-154', name: 'Syp Snokast', defaultStrength: 'N/A', defaultInstructions: 'As directed', category: 'Syrup' },
   { id: 'man-155', name: 'Cap Omega 3', defaultStrength: 'N/A', defaultInstructions: 'As directed', category: 'Capsule' },
@@ -254,7 +254,7 @@ export const INITIAL_DRUGS: DrugTemplate[] = [
   { id: 'man-251', name: 'Sir cipesta DS', defaultStrength: 'N/A', defaultInstructions: 'As directed', category: 'Solution' },
   { id: 'man-252', name: 'Tab Sumoxen', defaultStrength: '85/500mg', defaultInstructions: 'As directed', category: 'Tablet' },
   { id: 'man-253', name: 'Syp Domflash', defaultStrength: '5mg', defaultInstructions: 'As directed', category: 'Syrup' },
-  { id: 'man-254', name: 'Tab cefixime', defaultStrength: '200mg iran', defaultInstructions: 'As directed', category: 'Tablet' },
+  { id: 'man-254', name: 'Tab cefixime', defaultStrength: '200mg', defaultInstructions: 'As directed', category: 'Tablet' },
   { id: 'man-255', name: 'SYP STOGEST', defaultStrength: '240', defaultInstructions: 'As directed', category: 'Syrup' },
   { id: 'man-256', name: 'Syp INDOMAG', defaultStrength: '200ml', defaultInstructions: 'As directed', category: 'Syrup' },
   { id: 'man-257', name: 'Drop rocip -D', defaultStrength: 'N/A', defaultInstructions: 'As directed', category: 'Drop' },
@@ -274,7 +274,7 @@ export const INITIAL_DRUGS: DrugTemplate[] = [
   { id: 'man-271', name: 'Tab Tinidazole', defaultStrength: '500mg', defaultInstructions: 'As directed', category: 'Tablet' },
   { id: 'man-272', name: 'Tab Dine 35', defaultStrength: 'N/A', defaultInstructions: 'As directed', category: 'Tablet' },
   { id: 'man-273', name: 'Tab Estraiol', defaultStrength: '1mg', defaultInstructions: 'As directed', category: 'Tablet' },
-  { id: 'man-274', name: 'Tab Methyldopa', defaultStrength: '250', defaultInstructions: 'As directed', category: 'Tablet' },
+  { id: 'man-274', name: 'Tab Methyldopa', defaultStrength: '250mg', defaultInstructions: 'As directed', category: 'Tablet' },
   { id: 'man-275', name: 'Cap Pregabalin', defaultStrength: '75mg', defaultInstructions: 'As directed', category: 'Capsule' }
 ];
 
