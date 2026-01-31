@@ -195,7 +195,6 @@ const App: React.FC = () => {
   };
 
   const handleSaveToTemplates = (pr: Prescription) => {
-    // Check for duplicates based on content (diagnosis and medications)
     const isDuplicate = templatePrescriptions.some(t => 
       t.diagnosis === pr.diagnosis && 
       JSON.stringify(t.medications) === JSON.stringify(pr.medications)
@@ -466,10 +465,8 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
-  // High-performance cache for custom drugs (doctor's own items)
   const [allCustomDrugs, setAllCustomDrugs] = useState<any[]>([]);
 
-  // Pre-load custom drugs for instant searching without scanning 500k generic items
   useEffect(() => {
     if (!db) return;
     const tx = db.transaction(DRUG_STORE, 'readonly');
@@ -499,17 +496,15 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     if (!db) return;
     const searchLower = search.toLowerCase();
 
-    // OPTIMIZED SEARCH: For custom drugs, use the pre-loaded memory cache for instant response
     if (showCustomOnly) {
       const filtered = allCustomDrugs
         .filter(d => !searchLower || d.name_lower.includes(searchLower))
-        .sort((a, b) => b.id.localeCompare(a.id)) // Newest first
+        .sort((a, b) => b.id.localeCompare(a.id))
         .slice(0, 50);
       setDrugResults(filtered);
       return;
     }
 
-    // Generic search for the 500k item library (only when searching all)
     const tx = db.transaction(DRUG_STORE, 'readonly');
     const store = tx.objectStore(DRUG_STORE);
     const index = store.index('name_lower');
@@ -534,29 +529,22 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const toggleCC = (item: string) => {
     setCc(prev => {
       const items = prev ? prev.split(', ').filter(x => x) : [];
-      if (items.includes(item)) {
-        return items.filter(x => x !== item).join(', ');
-      } else {
-        return [...items, item].join(', ');
-      }
+      if (items.includes(item)) return items.filter(x => x !== item).join(', ');
+      return [...items, item].join(', ');
     });
   };
 
   const toggleDiag = (item: string) => {
     setDiag(prev => {
       const items = prev ? prev.split(', ').filter(x => x) : [];
-      if (items.includes(item)) {
-        return items.filter(x => x !== item).join(', ');
-      } else {
-        return [...items, item].join(', ');
-      }
+      if (items.includes(item)) return items.filter(x => x !== item).join(', ');
+      return [...items, item].join(', ');
     });
   };
 
   const handleAddManualDrug = async () => {
     if (!manualDrug.name) return;
     const newId = `custom-${Date.now()}`;
-    
     const drugData = { 
       id: newId,
       name: manualDrug.name,
@@ -569,18 +557,14 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     try {
       const tx = db.transaction(DRUG_STORE, 'readwrite');
       const store = tx.objectStore(DRUG_STORE);
-      const putReq = store.put(drugData);
-      
-      putReq.onsuccess = () => {
+      store.put(drugData).onsuccess = () => {
         setMeds([...meds, { ...drugData, strength: manualDrug.strength, quantity: '1', instructions: manualDrug.instructions }]);
         setIsAddingManual(false);
         setManualDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
         setSearch('');
         setRefreshTrigger(prev => prev + 1);
       };
-    } catch (e) {
-      console.error('Error saving drug:', e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const updateMed = (index: number, field: string, value: string) => {
@@ -634,73 +618,20 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-indigo-700 flex items-center gap-2">دواهای تجویزی <Database className="w-4 h-4" /></h3>
             <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
-              <button 
-                onClick={() => {
-                  setShowCustomOnly(false);
-                  setSearch('Tab ');
-                  setTimeout(() => document.getElementById('drug-search-input')?.focus(), 0);
-                }} 
-                className="whitespace-nowrap px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-bold border border-blue-100 hover:bg-blue-100 transition-colors"
-              >
-                سرچ تابلیت
-              </button>
-              <button 
-                onClick={() => {
-                  setShowCustomOnly(false);
-                  setSearch('Cap ');
-                  setTimeout(() => document.getElementById('drug-search-input')?.focus(), 0);
-                }} 
-                className="whitespace-nowrap px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[9px] font-bold border border-amber-100 hover:bg-amber-100 transition-colors"
-              >
-                سرچ کپسول
-              </button>
-              <button 
-                onClick={() => {
-                  setShowCustomOnly(false);
-                  setSearch('Syp ');
-                  setTimeout(() => document.getElementById('drug-search-input')?.focus(), 0);
-                }} 
-                className="whitespace-nowrap px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors"
-              >
-                سرچ شربت
-              </button>
-              <button 
-                onClick={() => {
-                  setIsAddingManual(true);
-                  setShowCustomOnly(false);
-                }} 
-                className="whitespace-nowrap px-2.5 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-[9px] font-bold border border-rose-100 hover:bg-rose-100 transition-colors"
-              >
-                افزودن دارو خود ما
-              </button>
-              <button 
-                onClick={() => setShowCustomOnly(!showCustomOnly)} 
-                className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${showCustomOnly ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' : 'bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100'}`}
-              >
-                انتخاب دارو خود ما
-              </button>
+              <button onClick={() => { setShowCustomOnly(false); setSearch('Tab '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-bold border border-blue-100">سرچ تابلیت</button>
+              <button onClick={() => { setShowCustomOnly(false); setSearch('Cap '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[9px] font-bold border border-amber-100">سرچ کپسول</button>
+              <button onClick={() => { setShowCustomOnly(false); setSearch('Syp '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-bold border border-emerald-100">سرچ شربت</button>
+              <button onClick={() => setIsAddingManual(true)} className="whitespace-nowrap px-2.5 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-[9px] font-bold border border-rose-100">افزودن دارو خود ما</button>
+              <button onClick={() => setShowCustomOnly(!showCustomOnly)} className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${showCustomOnly ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>انتخاب دارو خود ما</button>
             </div>
           </div>
           <div className="relative w-full">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input 
-              id="drug-search-input"
-              className="text-sm w-full py-3 pr-10 pl-3 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100" 
-              placeholder={showCustomOnly ? "جستجو در داروهای شخصی شما..." : "جستجوی دوا..."} 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
-            />
+            <input id="drug-search-input" className="text-sm w-full py-3 pr-10 pl-3 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100" placeholder={showCustomOnly ? "جستجو در داروهای شخصی شما..." : "جستجوی دوا..."} value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
 
-        {!isAddingManual ? (
-          <button 
-            onClick={() => { setIsAddingManual(true); setManualDrug({...manualDrug, name: search}); }}
-            className="w-full p-3 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold border border-emerald-100 flex items-center justify-center gap-2 hover:bg-emerald-100 transition-all"
-          >
-            <PlusCircle className="w-4 h-4" /> اضافه کردن داروی جدید
-          </button>
-        ) : (
+        {isAddingManual && (
           <div className="bg-emerald-50 p-4 rounded-2xl space-y-3 border border-emerald-100 fade-in">
             <div className="text-xs font-bold text-emerald-800">ثبت داروی جدید</div>
             <input className="w-full p-3 bg-white border-0 rounded-xl text-xs" placeholder="نام دوا" value={manualDrug.name} onChange={e => setManualDrug({...manualDrug, name: e.target.value})} />
@@ -723,55 +654,27 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
               <span className="font-bold">{d.name} <span className="text-gray-400 text-xs font-normal">({d.defaultStrength})</span></span>
             </button>
           ))}
-          {drugResults.length === 0 && !isAddingManual && <div className="text-center text-xs text-gray-400 py-4">موردی یافت نشد</div>}
         </div>
 
         <div className="border-t pt-4 space-y-2">
           {meds.map((m, i) => (
             <div key={i} className="flex flex-col p-3 bg-indigo-50 rounded-2xl ltr shadow-sm space-y-2 border border-indigo-100/50">
               <div className="flex justify-between items-center">
-                <button onClick={() => setMeds(meds.filter((_, idx) => idx !== i))} className="p-2 hover:bg-red-50 rounded-full transition-colors"><Trash2 className="w-4 h-4 text-red-500" /></button>
-                <div className="text-left flex-1 px-4">
-                  <b className="text-indigo-900 font-bold">{m.name}</b>
-                </div>
+                <button onClick={() => setMeds(meds.filter((_, idx) => idx !== i))} className="p-2 hover:bg-red-50 rounded-full"><Trash2 className="w-4 h-4 text-red-500" /></button>
+                <div className="text-left flex-1 px-4"><b className="text-indigo-900 font-bold">{m.name}</b></div>
               </div>
               <div className="flex gap-2 items-center px-4">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[8px] text-indigo-400 font-bold ml-1 uppercase">Dose</span>
-                  <input 
-                    className="w-24 p-2 text-[10px] rounded-lg border-none bg-white/70 focus:bg-white outline-none shadow-sm transition-all" 
-                    placeholder="Dose" 
-                    value={m.strength || ''} 
-                    onChange={e => updateMed(i, 'strength', e.target.value)} 
-                  />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[8px] text-indigo-400 font-bold ml-1 uppercase">Qty</span>
-                  <input 
-                    className="w-14 p-2 text-[10px] rounded-lg border-none bg-white/70 focus:bg-white outline-none text-center shadow-sm transition-all" 
-                    placeholder="Qty" 
-                    value={m.quantity || ''} 
-                    onChange={e => updateMed(i, 'quantity', e.target.value)} 
-                  />
-                </div>
-                <div className="flex-1 flex flex-col gap-0.5">
-                  <span className="text-[8px] text-indigo-400 font-bold ml-1 uppercase">Instructions</span>
-                  <input 
-                    className="w-full p-2 text-[10px] rounded-lg border-none bg-white/70 focus:bg-white outline-none shadow-sm transition-all" 
-                    placeholder="Instructions" 
-                    value={m.instructions || ''} 
-                    onChange={e => updateMed(i, 'instructions', e.target.value)} 
-                  />
-                </div>
+                <input className="w-24 p-2 text-[10px] rounded-lg bg-white/70 outline-none" placeholder="Dose" value={m.strength || ''} onChange={e => updateMed(i, 'strength', e.target.value)} />
+                <input className="w-14 p-2 text-[10px] rounded-lg bg-white/70 outline-none text-center" placeholder="Qty" value={m.quantity || ''} onChange={e => updateMed(i, 'quantity', e.target.value)} />
+                <input className="flex-1 p-2 text-[10px] rounded-lg bg-white/70 outline-none" placeholder="Instructions" value={m.instructions || ''} onChange={e => updateMed(i, 'instructions', e.target.value)} />
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      <button onClick={() => onSubmit({ patientId: patient.id, cc, diagnosis: diag, medications: meds, clinicalRecords: vitals })} className="w-full bg-indigo-700 text-white p-5 rounded-[2rem] font-bold shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-3">
-        <Save className="w-5 h-5" />
-        ذخیره و چاپ نسخه
+      <button onClick={() => onSubmit({ patientId: patient.id, cc, diagnosis: diag, medications: meds, clinicalRecords: vitals })} className="w-full bg-indigo-700 text-white p-5 rounded-[2rem] font-bold shadow-xl flex items-center justify-center gap-3">
+        <Save className="w-5 h-5" /> ذخیره و چاپ نسخه
       </button>
     </div>
   );
@@ -788,9 +691,7 @@ const DrugSettings = ({ db }: any) => {
     db.transaction(DRUG_STORE).objectStore(DRUG_STORE).getAll(null, 100).onsuccess = (e: any) => setDrugs(e.target.result);
   };
 
-  useEffect(() => {
-    loadDrugs();
-  }, [db]);
+  useEffect(() => { loadDrugs(); }, [db]);
 
   const handleSaveNewDrug = async () => {
     if (!newDrug.name) return;
@@ -802,195 +703,44 @@ const DrugSettings = ({ db }: any) => {
       defaultInstructions: newDrug.instructions,
       category: newDrug.category
     };
-
     try {
       const tx = db.transaction(DRUG_STORE, 'readwrite');
-      const store = tx.objectStore(DRUG_STORE);
-      store.put(drugData).onsuccess = () => {
+      tx.objectStore(DRUG_STORE).put(drugData).onsuccess = () => {
         setIsAdding(false);
         setNewDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
         loadDrugs();
       };
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleBulkImport = (prefix: string) => {
-    if (!db || isImporting) return;
-    setIsImporting(true);
-    const TARGET_COUNT = 500000;
-    
-    const forms = ['Tab ', 'Syr ', 'Inj ', 'Cap ', 'Drops ', 'Cream ', 'Oint ', 'Spray ', 'Susp ', 'Gel '];
-    const stems = ['Amoxi', 'Cipro', 'Levo', 'Atorva', 'Omepra', 'Paraceta', 'Ibupro', 'Azithro', 'Ceftri', 'Metroni', 'Losar', 'Amlodi', 'Bisopro', 'Panto', 'Esomep', 'Diclo', 'Napro', 'Mefena', 'Celeco', 'Trana', 'Keto', 'Melo', 'Indo', 'Fluco', 'Clarithro', 'Roxy', 'Terbi', 'Ketoco', 'Predni', 'Dexa', 'Hydro', 'Betame'];
-    const suffixes = ['cillin', 'floxacin', 'statin', 'zole', 'mol', 'fen', 'mycin', 'axone', 'dazole', 'tan', 'pine', 'lol', 'prazole', 'nac', 'xen', 'mic', 'nib', 'mab', 'sone', 'lone', 'line', 'zine', 'mine', 'pril'];
-    const categories = ['Analgesic', 'Antibiotic', 'Gastro', 'Cardiac', 'Dermatology', 'Neurology', 'Vitamin', 'Respiratory', 'Pediatric'];
-
-    let i = 0;
-    const populateBatch = () => {
-      const txBatch = db.transaction(DRUG_STORE, 'readwrite');
-      const storeBatch = txBatch.objectStore(DRUG_STORE);
-      const batchLimit = Math.min(i + 15000, TARGET_COUNT);
-      
-      for (; i < batchLimit; i++) {
-        const form = forms[i % forms.length];
-        const stem = stems[i % stems.length];
-        const suffix = suffixes[i % suffixes.length];
-        const name = `${form}${stem}${suffix}-${i}`;
-        
-        storeBatch.put({
-          id: `${prefix}-${i}`,
-          name: name,
-          name_lower: name.toLowerCase(),
-          category: categories[i % categories.length],
-          defaultStrength: `${((i % 20) + 1) * 25}mg`,
-          defaultInstructions: 'Daily Use - After Meal'
-        });
-      }
-      
-      if (i < TARGET_COUNT) {
-        if (i % 45000 === 0) loadDrugs();
-        setTimeout(populateBatch, 0);
-      } else {
-        setIsImporting(false);
-        alert('تمام اطلاعات با موفقیت وارد بانک دوا شد!');
-        loadDrugs();
-      }
-    };
-    populateBatch();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !db) return;
-
-    setIsImporting(true);
-    
-    try {
-      let content = "";
-      if (file.name.endsWith('.docx')) {
-        const arrayBuffer = await file.arrayBuffer();
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        content = result.value;
-      } else {
-        content = await file.text();
-      }
-
-      let importedDrugs: any[] = [];
-      
-      try {
-        const json = JSON.parse(content);
-        importedDrugs = Array.isArray(json) ? json : [json];
-      } catch {
-        const lines = content.split('\n').filter(l => l.trim());
-        importedDrugs = lines.map((line, idx) => ({
-          name: line.trim(),
-          defaultStrength: 'N/A',
-          defaultInstructions: 'As directed',
-          category: 'Imported'
-        }));
-      }
-
-      if (importedDrugs.length === 0) {
-        setIsImporting(false);
-        alert('فایل خالی است یا فرمت آن معتبر نیست.');
-        return;
-      }
-
-      const tx = db.transaction(DRUG_STORE, 'readwrite');
-      const store = tx.objectStore(DRUG_STORE);
-      
-      importedDrugs.forEach((drug, idx) => {
-        store.put({
-          id: `file-import-${Date.now()}-${idx}`,
-          name: drug.name || 'نامشخص',
-          name_lower: (drug.name || 'نامشخص').toLowerCase(),
-          defaultStrength: drug.defaultStrength || drug.strength || 'N/A',
-          defaultInstructions: drug.defaultInstructions || drug.instructions || 'As directed',
-          category: drug.category || 'General'
-        });
-      });
-
-      tx.oncomplete = () => {
-        setIsImporting(false);
-        alert(`${importedDrugs.length} قلم دوا با موفقیت از سند وارد شد!`);
-        loadDrugs();
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      };
-    } catch (err) {
-      setIsImporting(false);
-      alert('خطا در خواندن فایل یا استخراج متن از سند ورد.');
-      console.error(err);
-    }
+    } catch (e) { console.error(e); }
   };
 
   return (
     <div className="space-y-4 fade-in">
       <h2 className="font-bold text-center text-indigo-900 border-b pb-4">بانک داروهای آماده</h2>
-
       <div className="flex flex-col gap-3">
         {!isAdding ? (
-          <button 
-            onClick={() => setIsAdding(true)}
-            className="w-full p-5 bg-indigo-50 text-indigo-700 rounded-3xl font-bold flex items-center justify-center gap-2 border border-indigo-100 hover:bg-indigo-100 transition-all"
-          >
+          <button onClick={() => setIsAdding(true)} className="w-full p-5 bg-indigo-50 text-indigo-700 rounded-3xl font-bold flex items-center justify-center gap-2 border border-indigo-100">
             <PlusCircle className="w-5 h-5" /> افزودن دوا جدید
           </button>
         ) : (
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-indigo-100 space-y-4 fade-in">
-            <div className="font-bold text-indigo-900">مشخصات دوای جدید</div>
-            <div className="space-y-3">
-              <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="نام دوا" value={newDrug.name} onChange={e => setNewDrug({...newDrug, name: e.target.value})} />
-              <div className="flex gap-2">
-                <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="دوز (e.g. 500mg)" value={newDrug.strength} onChange={e => setNewDrug({...newDrug, strength: e.target.value})} />
-                <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="کتگوری" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
-              </div>
-              <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none focus:ring-2 focus:ring-indigo-100" placeholder="طریقه مصرف" value={newDrug.instructions} onChange={e => setNewDrug({...newDrug, instructions: e.target.value})} />
-              <div className="flex gap-3 pt-2">
-                <button onClick={handleSaveNewDrug} className="flex-2 bg-indigo-600 text-white p-4 rounded-2xl font-bold">ذخیره در بانک</button>
-                <button onClick={() => setIsAdding(false)} className="bg-white text-gray-400 p-4 rounded-2xl font-bold">لغو</button>
-              </div>
+            <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none" placeholder="نام دوا" value={newDrug.name} onChange={e => setNewDrug({...newDrug, name: e.target.value})} />
+            <div className="flex gap-2">
+              <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none" placeholder="دوز" value={newDrug.strength} onChange={e => setNewDrug({...newDrug, strength: e.target.value})} />
+              <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none" placeholder="کتگوری" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
+            </div>
+            <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none" placeholder="طریقه مصرف" value={newDrug.instructions} onChange={e => setNewDrug({...newDrug, instructions: e.target.value})} />
+            <div className="flex gap-3 pt-2">
+              <button onClick={handleSaveNewDrug} className="flex-2 bg-indigo-600 text-white p-4 rounded-2xl font-bold">ذخیره در بانک</button>
+              <button onClick={() => setIsAdding(false)} className="bg-white text-gray-400 p-4 rounded-2xl font-bold">لغو</button>
             </div>
           </div>
         )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button 
-            onClick={() => handleBulkImport('flash')}
-            disabled={isImporting}
-            className={`w-full p-5 bg-emerald-600 text-white rounded-3xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95 ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <Download className="w-5 h-5" /> 
-            {isImporting ? 'در حال دریافت...' : 'دریافت دواها از فلش'}
-          </button>
-
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isImporting}
-            className={`w-full p-5 bg-indigo-600 text-white rounded-3xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-100 transition-all active:scale-95 ${isImporting ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <FileUp className="w-5 h-5" /> 
-            {isImporting ? 'در حال پردازش...' : 'افزودن چندین دوا از سند ورد'}
-          </button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
-            className="hidden" 
-            accept=".json,.txt,.docx"
-          />
-        </div>
       </div>
-
-      <p className="text-[10px] text-center text-gray-400 italic">نمایش ۱۰۰ مورد تصادفی از کل بانک دوا</p>
       <div className="grid gap-2">
         {drugs.map(d => (
           <div key={d.id} className="bg-white p-4 rounded-2xl shadow-sm text-right border border-gray-50 flex justify-between items-center">
             <span className="text-[10px] text-indigo-300 font-mono uppercase">{d.category}</span>
-            <div className="flex flex-col items-end">
-              <b className="text-gray-800 font-bold">{d.name}</b>
-              <span className="text-xs text-gray-400">{d.defaultStrength}</span>
-            </div>
+            <div className="flex flex-col items-end"><b className="text-gray-800 font-bold">{d.name}</b><span className="text-xs text-gray-400">{d.defaultStrength}</span></div>
           </div>
         ))}
       </div>
@@ -1001,95 +751,24 @@ const DrugSettings = ({ db }: any) => {
 const ClinicSettingsForm = ({ settings, onSave, storedPin, onSavePin, onBack }: any) => {
   const [d, setD] = useState<ClinicSettings>(settings);
   const [newPin, setNewPin] = useState(storedPin);
-
-  const handleSave = () => {
-    onSave(d);
-    onSavePin(newPin);
-    alert('تمام تغییرات با موفقیت در سیستم ذخیره شد!');
-  };
-
+  const handleSave = () => { onSave(d); onSavePin(newPin); alert('ذخیره شد!'); };
   return (
     <div className="space-y-6 text-right fade-in">
       <div className="flex justify-between items-center mb-4">
-        <button onClick={onBack} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"><ChevronLeft /></button>
+        <button onClick={onBack} className="p-2 bg-gray-100 rounded-full"><ChevronLeft /></button>
         <h2 className="text-xl font-bold text-indigo-900">تنظیمات کلینیک</h2>
       </div>
-
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-        <h3 className="font-bold border-r-4 border-indigo-600 pr-2 text-indigo-700 flex items-center gap-2">اطلاعات پایه <Edit3 className="w-4 h-4"/></h3>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-400 font-bold pr-2">نام کلینیک / مرکز صحی</label>
-            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="نام کلینیک" value={d.name} onChange={e => setD({...d, name: e.target.value})} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-400 font-bold pr-2">نام کامل داکتر</label>
-            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="نام داکتر" value={d.doctor} onChange={e => setD({...d, doctor: e.target.value})} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-400 font-bold pr-2">تخصص داکتر</label>
-            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="تخصص (مثلاً متخصص داخله)" value={d.specialty} onChange={e => setD({...d, specialty: e.target.value})} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-400 font-bold pr-2">شعار کلینیک / متن توضیحی</label>
-            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="شعار کلینیک" value={d.tagline} onChange={e => setD({...d, tagline: e.target.value})} />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-        <h3 className="font-bold border-r-4 border-amber-600 pr-2 text-amber-700 flex items-center gap-2">اطلاوات تماس <Phone className="w-4 h-4"/></h3>
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-400 font-bold pr-2">آدرس فزیکی</label>
-            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="آدرس کلینیک" value={d.address} onChange={e => setD({...d, address: e.target.value})} />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] text-gray-400 font-bold pr-2">شماره‌های تماس</label>
-            <input className="w-full p-4 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none transition-all" placeholder="شماره تماس" value={d.phone} onChange={e => setD({...d, phone: e.target.value})} />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-        <h3 className="font-bold border-r-4 border-emerald-600 pr-2 text-emerald-700">انتخاب سایز چاپ</h3>
+      <div className="bg-white p-6 rounded-3xl shadow-sm border space-y-4">
+        <input className="w-full p-4 rounded-2xl border bg-gray-50" placeholder="نام کلینیک" value={d.name} onChange={e => setD({...d, name: e.target.value})} />
+        <input className="w-full p-4 rounded-2xl border bg-gray-50" placeholder="نام داکتر" value={d.doctor} onChange={e => setD({...d, doctor: e.target.value})} />
+        <input className="w-full p-4 rounded-2xl border bg-gray-50" placeholder="آدرس" value={d.address} onChange={e => setD({...d, address: e.target.value})} />
         <div className="flex gap-4">
-          <button 
-            onClick={() => setD({...d, printLayout: {...d.printLayout, pageSize: 'A4'}})}
-            className={`flex-1 p-4 rounded-2xl font-bold transition-all border-2 ${d.printLayout.pageSize === 'A4' ? 'bg-indigo-50 border-indigo-600 text-indigo-700' : 'bg-gray-50 border-transparent text-gray-400'}`}
-          >
-            A4
-          </button>
-          <button 
-            onClick={() => setD({...d, printLayout: {...d.printLayout, pageSize: 'A5'}})}
-            className={`flex-1 p-4 rounded-2xl font-bold transition-all border-2 ${d.printLayout.pageSize === 'A5' ? 'bg-indigo-50 border-indigo-600 text-indigo-700' : 'bg-gray-50 border-transparent text-gray-400'}`}
-          >
-            A5
-          </button>
+          <button onClick={() => setD({...d, printLayout: {...d.printLayout, pageSize: 'A4'}})} className={`flex-1 p-4 rounded-2xl font-bold border-2 ${d.printLayout.pageSize === 'A4' ? 'bg-indigo-50 border-indigo-600' : 'bg-gray-50'}`}>A4</button>
+          <button onClick={() => setD({...d, printLayout: {...d.printLayout, pageSize: 'A5'}})} className={`flex-1 p-4 rounded-2xl font-bold border-2 ${d.printLayout.pageSize === 'A5' ? 'bg-indigo-50 border-indigo-600' : 'bg-gray-50'}`}>A5</button>
         </div>
+        <input type="password" className="w-full p-4 rounded-2xl border bg-gray-50 text-center" placeholder="رمز جدید PIN" value={newPin} onChange={e => setNewPin(e.target.value)} />
       </div>
-
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-        <h3 className="font-bold border-r-4 border-red-600 pr-2 text-red-700">تغییر رمز ورود (PIN)</h3>
-        <div className="flex flex-col gap-2">
-          <label className="text-xs text-gray-400 font-bold pr-1">رمز عبور جدید سیستم</label>
-          <div className="relative">
-            <Key className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 w-5 h-5" />
-            <input 
-              type="password" 
-              className="w-full p-4 pr-12 rounded-2xl border border-gray-100 bg-gray-50 focus:bg-white outline-none text-center text-xl tracking-[0.5em] transition-all" 
-              placeholder="****"
-              value={newPin} 
-              onChange={e => setNewPin(e.target.value)} 
-            />
-          </div>
-        </div>
-      </div>
-
-      <button onClick={handleSave} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold shadow-xl shadow-indigo-100 active:scale-95 transition-all flex items-center justify-center gap-2">
-        <Save className="w-5 h-5" />
-        ذخیره تمامی تغییرات
-      </button>
+      <button onClick={handleSave} className="w-full bg-indigo-700 text-white p-5 rounded-2xl font-bold flex items-center justify-center gap-2"><Save /> ذخیره تغییرات</button>
     </div>
   );
 };
@@ -1098,13 +777,9 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
   return (
     <div className="preview-modal-overlay no-print">
       <div className="preview-header-ui">
-        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X /></button>
-        <span className="font-bold text-indigo-900">پیش‌نمایش نسخه</span>
-        <button onClick={() => window.print()} className="bg-teal-700 hover:bg-teal-800 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95">
-          <Printer className="w-4 h-4" /> چاپ نسخه
-        </button>
+        <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><X /></button>
+        <button onClick={() => window.print()} className="bg-teal-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Printer className="w-4 h-4" /> چاپ نسخه</button>
       </div>
-
       <div className="preview-content">
         <div id="print-area" className="shadow-2xl" style={{ 
           width: settings.printLayout.pageSize === 'A5' ? '148mm' : '210mm', 
@@ -1112,69 +787,48 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
         }}>
           <div className="rx-header">
             <div className={`${settings.printLayout.pageSize === 'A5' ? 'h-[2.5cm]' : 'h-[4cm]'} w-full`}></div>
-            
             <div className={`flex justify-between items-baseline pb-2 mb-2 text-[11pt] font-bold ${settings.printLayout.pageSize === 'A5' ? 'mt-4' : 'mt-8'}`} style={{ direction: 'ltr' }}>
               <div className="flex gap-20 pl-8">
                 <span>Name: {patient.name}</span>
                 <span>Age: {patient.age}</span>
-                <span className="relative -top-[4px]">Gender: {patient.gender === 'male' ? 'Male' : patient.gender === 'female' ? 'Female' : patient.gender}</span>
+                <span className="relative -top-[4px]">Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
               </div>
               <div className="pr-8 relative -top-[4px]">Date: {new Date(prescription.date).toLocaleDateString('en-GB')}</div>
             </div>
           </div>
-
           <div className="rx-body">
             <div className="rx-sidebar">
-              <div className="flex flex-col items-center">
-                <div className="text-[8pt] font-bold mb-1">Clinical Record</div>
-                <div className="text-[8pt] space-y-1.5 mt-1 text-left w-full pl-5 pr-1 flex flex-col items-start" style={{ direction: 'ltr' }}>
-                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>BP:</span><span className="font-bold">{prescription.clinicalRecords.bp || '-'}</span></div>
-                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>HR:</span><span className="font-bold">{prescription.clinicalRecords.hr || '-'}</span></div>
-                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>PR:</span><span className="font-bold">{prescription.clinicalRecords.pr || '-'}</span></div>
-                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>SpO2:</span><span className="font-bold">{prescription.clinicalRecords.spo2 || '-'}</span></div>
-                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>Temp:</span><span className="font-bold">{prescription.clinicalRecords.temp || '-'}</span></div>
-                  <div className="flex gap-1 border-b border-gray-100 pb-0.5 w-full"><span>Wt:</span><span className="font-bold">{prescription.clinicalRecords.wt || '-'}</span></div>
-                  
-                  <div className="flex flex-col border-b border-gray-100 pb-1 pt-3 text-left w-full">
-                    <span className="text-[7pt] text-gray-500 uppercase font-bold mb-1">Chief Complain</span>
-                    <div className="font-bold text-[8pt] break-words leading-tight pl-1">{prescription.cc || '-'}</div>
-                  </div>
-
-                  <div className="flex flex-col items-center pt-14">
-                    <div className="text-[6pt] text-gray-400 uppercase">Diagnosis</div>
-                    <div className="font-bold text-[8pt] leading-tight text-center break-words w-full px-1">{prescription.diagnosis || '-'}</div>
-                  </div>
-                </div>
+              <div className="text-[8pt] font-bold mb-1">Clinical Record</div>
+              <div className="text-[8pt] space-y-1.5 text-left w-full pl-5 pr-1 flex flex-col items-start" style={{ direction: 'ltr' }}>
+                <div>BP: {prescription.clinicalRecords.bp || '-'}</div>
+                <div>HR: {prescription.clinicalRecords.hr || '-'}</div>
+                <div>PR: {prescription.clinicalRecords.pr || '-'}</div>
+                <div>SpO2: {prescription.clinicalRecords.spo2 || '-'}</div>
+                <div>Temp: {prescription.clinicalRecords.temp || '-'}</div>
+                <div>Wt: {prescription.clinicalRecords.wt || '-'}</div>
+                <div className="pt-3 font-bold">Chief Complain</div>
+                <div className="pl-1">{prescription.cc || '-'}</div>
+                <div className="pt-14 font-bold">Diagnosis</div>
+                <div className="text-center w-full px-1">{prescription.diagnosis || '-'}</div>
               </div>
-              
-              <div className={`${settings.printLayout.pageSize === 'A5' ? 'mt-40' : 'mt-auto'} space-y-4 mb-12`}>
-                <div className="flex flex-col items-center">
-                  <div className="text-[7pt] text-gray-400">CODE</div>
-                  <div className="font-bold text-[9pt]">{patient.code}</div>
-                </div>
+              <div className={`${settings.printLayout.pageSize === 'A5' ? 'mt-40' : 'mt-auto'} mb-12`}>
+                <div className="text-[7pt] text-gray-400">CODE</div>
+                <div className="font-bold text-[9pt]">{patient.code}</div>
               </div>
             </div>
-
             <div className="rx-main">
-              <ul className="meds-list" style={{ marginTop: settings.printLayout.pageSize === 'A4' ? '0mm' : '0mm' }}>
+              <ul className="meds-list">
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item mb-5">
-                    <div className={`font-bold text-[12pt] whitespace-nowrap overflow-hidden text-ellipsis flex items-baseline ${settings.printLayout.pageSize === 'A4' ? 'gap-32' : 'gap-12'}`}>
+                    <div className="font-bold text-[12pt] flex items-baseline gap-12">
                       <span>{idx + 1}. {m.name} {m.strength}</span>
-                      {m.quantity && m.quantity !== '1' && (
-                        <span className="font-normal text-[11pt] text-gray-800">N: {m.quantity}</span>
-                      )}
+                      {m.quantity && m.quantity !== '1' && <span className="font-normal text-[11pt]">N: {m.quantity}</span>}
                     </div>
-                    <div className="text-[10pt] text-gray-600 italic font-normal ml-8 mt-1">
-                      -- {m.instructions}
-                    </div>
+                    <div className="text-[10pt] text-gray-600 italic ml-8 mt-1">-- {m.instructions}</div>
                   </li>
                 ))}
               </ul>
             </div>
-          </div>
-
-          <div className="rx-footer">
           </div>
         </div>
       </div>
