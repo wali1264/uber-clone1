@@ -144,7 +144,7 @@ const App: React.FC = () => {
                   name_lower: name.toLowerCase(),
                   category: categories[i % categories.length],
                   defaultStrength: `${((i % 20) + 1) * 25}mg`,
-                  defaultInstructions: 'Daily Use - After Meal'
+                  defaultInstructions: 'Once daily'
                 });
               }
               
@@ -463,7 +463,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const [drugResults, setDrugResults] = useState<any[]>([]);
   const [isAddingManual, setIsAddingManual] = useState(false);
   const [showCustomOnly, setShowCustomOnly] = useState(false);
-  const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+  const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   
   // High-performance cache for custom drugs (doctor's own items)
@@ -572,7 +572,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
       store.put(drugData).onsuccess = () => {
         setMeds([...meds, { ...drugData, strength: manualDrug.strength, quantity: '1', instructions: manualDrug.instructions }]);
         setIsAddingManual(false);
-        setManualDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+        setManualDrug({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
         setSearch('');
         setRefreshTrigger(prev => prev + 1);
       };
@@ -584,6 +584,27 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     newMedsList[index] = { ...newMedsList[index], [field]: value };
     setMeds(newMedsList);
   };
+
+  const appendInstructionPart = (index: number, opt: string) => {
+    const current = meds[index].instructions || '';
+    if (current.includes(opt)) return; 
+    const next = current ? `${current} - ${opt}` : opt;
+    updateMed(index, 'instructions', next);
+  };
+
+  const QUICK_INSTRUCTIONS = [
+    'Once daily',
+    'Twice daily (q12h)',
+    'Three times daily (q8h)',
+    'Four times daily (q6h)',
+    'At bedtime',
+    'Morning (fasting)',
+    'After meal',
+    'Before meal',
+    'As needed (PRN)'
+  ];
+  const QUICK_DOSES = ['1 Tablet', '1/2 Tablet', '2 Tablets', '5 ml', '10 ml', '1 Ampoule', '1 Teaspoon', 'As directed'];
+  const ADMINISTRATION_ROUTES = ['PO', 'IM', 'IV'];
 
   return (
     <div className="space-y-6 pb-12 fade-in">
@@ -652,6 +673,16 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
               <input className="flex-1 p-3 bg-white border-0 rounded-xl text-xs" placeholder="کتگوری" value={manualDrug.category} onChange={e => setManualDrug({...manualDrug, category: e.target.value})} />
             </div>
             <input className="w-full p-3 bg-white border-0 rounded-xl text-xs" placeholder="طریقه مصرف" value={manualDrug.instructions} onChange={e => setManualDrug({...manualDrug, instructions: e.target.value})} />
+            <div className="flex flex-wrap gap-1">
+              {QUICK_DOSES.map(opt => (
+                <button key={opt} onClick={() => setManualDrug({...manualDrug, instructions: manualDrug.instructions ? `${manualDrug.instructions} - ${opt}` : opt})} className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-1 rounded border border-emerald-200 hover:bg-emerald-200 transition-colors">{opt}</button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1 border-t border-emerald-100 pt-1">
+              {QUICK_INSTRUCTIONS.map(opt => (
+                <button key={opt} onClick={() => setManualDrug({...manualDrug, instructions: manualDrug.instructions ? `${manualDrug.instructions} - ${opt}` : opt})} className="text-[9px] bg-white px-2 py-1 rounded border border-emerald-200 hover:bg-emerald-100 transition-colors">{opt}</button>
+              ))}
+            </div>
             <div className="flex gap-2">
               <button onClick={handleAddManualDrug} className="flex-1 bg-emerald-600 text-white p-3 rounded-xl font-bold text-xs">ثبت و اضافه</button>
               <button onClick={() => setIsAddingManual(false)} className="bg-white text-gray-400 p-3 rounded-xl font-bold text-xs border border-emerald-100">لغو</button>
@@ -678,7 +709,39 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
               <div className="flex gap-2 items-center px-4">
                 <input className="w-24 p-2 text-[10px] rounded-lg bg-white/70 outline-none" placeholder="Dose" value={m.strength || ''} onChange={e => updateMed(i, 'strength', e.target.value)} />
                 <input className="w-14 p-2 text-[10px] rounded-lg bg-white/70 outline-none text-center" placeholder="Qty" value={m.quantity || ''} onChange={e => updateMed(i, 'quantity', e.target.value)} />
-                <input className="flex-1 p-2 text-[10px] rounded-lg bg-white/70 outline-none" placeholder="Instructions" value={m.instructions || ''} onChange={e => updateMed(i, 'instructions', e.target.value)} />
+                <div className="flex-1 flex flex-col gap-1">
+                  <input className="w-full p-2 text-[10px] rounded-lg bg-white/70 outline-none" placeholder="Instructions" value={m.instructions || ''} onChange={e => updateMed(i, 'instructions', e.target.value)} />
+                  
+                  {/* Dose Row */}
+                  <div className="flex flex-wrap gap-1 items-center rtl">
+                     <span className="text-[9px] text-indigo-700 font-bold ml-1">Dose:</span>
+                    {QUICK_DOSES.map(opt => (
+                      <button key={opt} onClick={() => appendInstructionPart(i, opt)} className="text-[8px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-200 hover:bg-indigo-200 transition-colors font-bold">{opt}</button>
+                    ))}
+                  </div>
+
+                  {/* Timing Row */}
+                  <div className="flex flex-wrap gap-1 mt-1 border-t border-indigo-100 pt-1 items-center rtl">
+                     <span className="text-[9px] text-indigo-700 font-bold ml-1">Timing:</span>
+                    {QUICK_INSTRUCTIONS.map(opt => (
+                      <button key={opt} onClick={() => appendInstructionPart(i, opt)} className="text-[8px] bg-white/80 px-1.5 py-0.5 rounded border border-indigo-100 hover:bg-white transition-colors">{opt}</button>
+                    ))}
+                  </div>
+                  
+                  {/* PO, IM, IV Logic */}
+                  <div className="flex flex-wrap gap-1 mt-1 border-t border-indigo-100 pt-1">
+                    {ADMINISTRATION_ROUTES.map(opt => {
+                      const nameLower = m.name.toLowerCase();
+                      const isPill = nameLower.includes('tab') || nameLower.includes('cap');
+                      const isOintment = nameLower.includes('cream') || nameLower.includes('oint');
+                      const hide = (opt === 'IM' && isPill) || (opt === 'IV' && isOintment);
+                      if (hide) return null;
+                      return (
+                        <button key={opt} onClick={() => appendInstructionPart(i, opt)} className="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded border border-indigo-700 hover:bg-indigo-700 transition-colors">{opt}</button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
@@ -695,9 +758,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
 const DrugSettings = ({ db }: any) => {
   const [drugs, setDrugs] = useState<any[]>([]);
   const [isAdding, setIsAdding] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [newDrug, setNewDrug] = useState({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [newDrug, setNewDrug] = useState({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
 
   const loadDrugs = () => {
     db.transaction(DRUG_STORE).objectStore(DRUG_STORE).getAll(null, 100).onsuccess = (e: any) => setDrugs(e.target.result);
@@ -719,11 +780,24 @@ const DrugSettings = ({ db }: any) => {
       const tx = db.transaction(DRUG_STORE, 'readwrite');
       tx.objectStore(DRUG_STORE).put(drugData).onsuccess = () => {
         setIsAdding(false);
-        setNewDrug({ name: '', strength: '', instructions: 'Daily Use - After Meal', category: 'General' });
+        setNewDrug({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
         loadDrugs();
       };
     } catch (e) { console.error(e); }
   };
+
+  const QUICK_OPTS = [
+    'Once daily',
+    'Twice daily (q12h)',
+    'Three times daily (q8h)',
+    'Four times daily (q6h)',
+    'At bedtime',
+    'Morning (fasting)',
+    'After meal',
+    'Before meal',
+    'As needed (PRN)'
+  ];
+  const QUICK_DOSES = ['1 Tablet', '1/2 Tablet', '2 Tablets', '5 ml', '10 ml', '1 Ampoule', '1 Teaspoon', 'As directed'];
 
   return (
     <div className="space-y-4 fade-in">
@@ -741,6 +815,16 @@ const DrugSettings = ({ db }: any) => {
               <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none" placeholder="کتگوری" value={newDrug.category} onChange={e => setNewDrug({...newDrug, category: e.target.value})} />
             </div>
             <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none" placeholder="طریقه مصرف" value={newDrug.instructions} onChange={e => setNewDrug({...newDrug, instructions: e.target.value})} />
+            <div className="flex flex-wrap gap-2">
+              {QUICK_DOSES.map(opt => (
+                <button key={opt} onClick={() => setNewDrug({...newDrug, instructions: newDrug.instructions ? `${newDrug.instructions} - ${opt}` : opt})} className="text-[10px] bg-indigo-50 text-indigo-700 px-3 py-2 rounded border border-indigo-100 hover:bg-indigo-100 font-bold">{opt}</button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2 border-t border-indigo-100 pt-2">
+              {QUICK_OPTS.map(opt => (
+                <button key={opt} onClick={() => setNewDrug({...newDrug, instructions: newDrug.instructions ? `${newDrug.instructions} - ${opt}` : opt})} className="text-[10px] bg-white px-3 py-2 rounded border border-indigo-100 hover:bg-indigo-50">{opt}</button>
+              ))}
+            </div>
             <div className="flex gap-3 pt-2">
               <button onClick={handleSaveNewDrug} className="flex-2 bg-indigo-600 text-white p-4 rounded-2xl font-bold">ذخیره در بانک</button>
               <button onClick={() => setIsAdding(false)} className="bg-white text-gray-400 p-4 rounded-2xl font-bold">لغو</button>
