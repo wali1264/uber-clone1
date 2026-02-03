@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Users, 
@@ -33,7 +34,8 @@ import {
   Copy,
   FolderHeart,
   Star,
-  FolderEdit
+  FolderEdit,
+  Calendar
 } from 'lucide-react';
 import { Patient, Prescription, DrugTemplate, ViewState, Medication, ClinicalRecords, ClinicSettings } from './types';
 import { INITIAL_DRUGS, DEFAULT_CLINIC_SETTINGS } from './constants';
@@ -206,13 +208,19 @@ const App: React.FC = () => {
       return;
     }
 
-    const newTmpl = { ...pr, id: `tmpl-${pr.id}`, date: getAdjustedTime() };
+    const newTmpl = { ...pr, id: `tmpl-${pr.id}`, date: pr.date };
     setTemplatePrescriptions([newTmpl, ...templatePrescriptions]);
     alert('نسخه با موفقیت به پوشه نسخه‌های قابل ویرایش اضافه شد.');
   };
 
   const handleRemoveTemplate = (id: string) => {
     setTemplatePrescriptions(templatePrescriptions.filter(t => t.id !== id));
+  };
+
+  const handleDeletePrescription = (id: string) => {
+    if (window.confirm('آیا از حذف این نسخه اطمینان دارید؟ این عمل قابل بازگشت نیست.')) {
+      setPrescriptions(prescriptions.filter(pr => pr.id !== id));
+    }
   };
 
   const filteredPatients = useMemo(() => {
@@ -318,7 +326,8 @@ const App: React.FC = () => {
             db={db} patient={patients.find(p => p.id === selectedPatientId)!}
             initialData={draftPrescription}
             onSubmit={(pr: any) => {
-              const newPr = { ...pr, id: Math.random().toString(36).substr(2, 9), date: getAdjustedTime() };
+              const newId = Math.random().toString(36).substr(2, 9);
+              const newPr = { ...pr, id: newId, date: getAdjustedTime() };
               setPrescriptions([newPr, ...prescriptions]); setSelectedPrescription(newPr); setDraftPrescription(null); setView('VIEW_PDF');
             }}
           />
@@ -338,17 +347,20 @@ const App: React.FC = () => {
                   return (
                     <div key={pr.id} className="bg-white p-4 rounded-2xl shadow-sm text-right border border-transparent hover:border-indigo-100 transition-all">
                       <div className="flex justify-between items-start">
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5">
                            <button onClick={() => { setSelectedPrescription(pr); setView('VIEW_PDF'); }} className="p-2.5 bg-gray-50 text-gray-500 rounded-xl hover:bg-indigo-50 hover:text-indigo-600 transition-colors" title="مشاهده"><Eye className="w-4 h-4" /></button>
                            <button onClick={() => handleSaveToTemplates(pr)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all" title="افزودن به پوشه الگوها"><Star className="w-4 h-4" /></button>
                            <button onClick={() => { setDraftPrescription(pr); setView('PATIENTS'); }} className="p-2.5 bg-emerald-50 text-emerald-700 rounded-xl hover:bg-emerald-100 transition-colors flex items-center gap-1" title="استفاده مجدد"><Copy className="w-4 h-4" /><span className="text-[10px] font-bold">تکرار</span></button>
+                           <button onClick={() => handleDeletePrescription(pr.id)} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all" title="حذف نسخه"><Trash2 className="w-4 h-4" /></button>
                         </div>
                         <div className="flex-1 pr-4">
-                          <div className="flex justify-between">
-                            <span className="text-[10px] text-gray-400">{new Date(pr.date).toLocaleDateString('fa-AF')}</span>
-                            <b className="font-bold">{p?.name}</b>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg text-[9px] font-bold flex items-center gap-1">
+                              <Calendar className="w-3 h-3" /> {new Date(pr.date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                            </span>
+                            <b className="font-bold text-indigo-900">{p?.name}</b>
                           </div>
-                          <div className="text-xs text-indigo-600 mt-1">{pr.diagnosis || 'بدون تشخیص'}</div>
+                          <div className="text-xs text-slate-500">{pr.diagnosis || 'بدون تشخیص'}</div>
                         </div>
                       </div>
                     </div>
@@ -889,7 +901,7 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
                 <span>Age: {patient.age}</span>
                 <span className="relative -top-[4px]">Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
               </div>
-              <div className="pr-8 relative -top-[4px]">Date: {new Date(prescription.date).toLocaleDateString('en-GB')}</div>
+              <div className="pr-8 relative -top-[4px]">Date: {new Date(prescription.date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}</div>
             </div>
           </div>
           <div className="rx-body">
