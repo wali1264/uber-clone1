@@ -197,6 +197,10 @@ const App: React.FC = () => {
     setPatients(patients.map(p => p.id === id ? { ...p, isHidden: !p.isHidden } : p));
   };
 
+  const handleUpdatePatientInfo = (pid: string, updates: Partial<Patient>) => {
+    setPatients(prev => prev.map(p => p.id === pid ? { ...p, ...updates } : p));
+  };
+
   const handleSaveToTemplates = (pr: Prescription) => {
     const isDuplicate = templatePrescriptions.some(t => 
       t.diagnosis === pr.diagnosis && 
@@ -373,26 +377,53 @@ const App: React.FC = () => {
                 <div className="text-[10px] text-indigo-500 font-bold pr-2 flex items-center gap-2">
                   <FolderHeart className="w-3 h-3" /> نسخه‌های پرکاربرد ذخیره شده جهت استفاده سریع
                 </div>
-                {templatePrescriptions.map(pr => (
-                  <div key={pr.id} className="bg-white p-5 rounded-3xl shadow-sm text-right border-2 border-indigo-100/30 hover:border-indigo-500 transition-all group">
-                    <div className="flex justify-between items-start">
-                      <div className="flex gap-2">
-                         <button onClick={() => handleRemoveTemplate(pr.id)} className="p-2.5 text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                         <button onClick={() => { setDraftPrescription(pr); setView('PATIENTS'); }} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md active:scale-95 flex items-center gap-2 font-bold text-xs"><PlusCircle className="w-4 h-4" /> استفاده از این الگو</button>
-                      </div>
-                      <div className="flex-1 pr-4">
-                        <b className="text-indigo-900 block">{pr.diagnosis || 'نسخه آماده'}</b>
-                        <div className="text-[10px] text-gray-400 mt-1">{pr.medications.length} قلم دوا در این الگو موجود است</div>
-                        <div className="mt-2 flex flex-wrap gap-1 justify-end">
-                          {pr.medications.slice(0, 3).map((m, idx) => (
-                            <span key={idx} className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[8px]">{m.name}</span>
-                          ))}
-                          {pr.medications.length > 3 && <span className="text-[8px] text-gray-300">...</span>}
+                {templatePrescriptions.map(pr => {
+                  const p = patients.find(x => x.id === pr.patientId);
+                  return (
+                    <div key={pr.id} className="bg-white p-5 rounded-3xl shadow-sm text-right border-2 border-indigo-100/30 hover:border-indigo-500 transition-all group">
+                      <div className="flex justify-between items-start">
+                        <div className="flex gap-2">
+                           <button onClick={() => handleRemoveTemplate(pr.id)} className="p-2.5 text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                           <button onClick={() => { setDraftPrescription(pr); setView('PATIENTS'); }} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all shadow-md active:scale-95 flex items-center gap-2 font-bold text-xs"><PlusCircle className="w-4 h-4" /> استفاده از این الگو</button>
+                        </div>
+                        <div className="flex-1 pr-4">
+                          <b className="text-indigo-900 block mb-3">{pr.diagnosis || 'نسخه آماده'}</b>
+                          
+                          {/* Editable Section for Templates Only */}
+                          <div className="bg-gray-50/50 p-3 rounded-2xl border border-dashed border-indigo-100 space-y-2 mb-3">
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">اسم مریض:</span>
+                                <input 
+                                   className="flex-1 text-right text-xs font-bold text-slate-700 bg-white rounded-lg px-2 py-1.5 border border-indigo-50 focus:border-indigo-400 outline-none transition-all"
+                                   value={p?.name || ''}
+                                   onChange={(e) => handleUpdatePatientInfo(pr.patientId, { name: e.target.value })}
+                                />
+                             </div>
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">جنسیت:</span>
+                                <select 
+                                   className="flex-1 text-right text-[10px] text-slate-600 bg-white rounded-lg px-2 py-1.5 border border-indigo-50 focus:border-indigo-400 outline-none cursor-pointer"
+                                   value={p?.gender || 'male'}
+                                   onChange={(e) => handleUpdatePatientInfo(pr.patientId, { gender: e.target.value as any })}
+                                >
+                                   <option value="male">مذکر</option>
+                                   <option value="female">مونث</option>
+                                </select>
+                             </div>
+                          </div>
+
+                          <div className="text-[10px] text-gray-400 mt-1">{pr.medications.length} قلم دوا در این الگو موجود است</div>
+                          <div className="mt-2 flex flex-wrap gap-1 justify-end">
+                            {pr.medications.slice(0, 3).map((m, idx) => (
+                              <span key={idx} className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[8px]">{m.name}</span>
+                            ))}
+                            {pr.medications.length > 3 && <span className="text-[8px] text-gray-300">...</span>}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {templatePrescriptions.length === 0 && (
                   <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-gray-100">
                     <FolderEdit className="w-12 h-12 text-gray-200 mx-auto mb-3" />
@@ -896,12 +927,23 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
           <div className="rx-header">
             <div className={`${settings.printLayout.pageSize === 'A5' ? 'h-[2.5cm]' : 'h-[4cm]'} w-full`}></div>
             <div className={`flex justify-between items-baseline pb-2 mb-2 text-[11pt] font-bold ${settings.printLayout.pageSize === 'A5' ? 'mt-4' : 'mt-8'}`} style={{ direction: 'ltr' }}>
-              <div className="flex gap-20 pl-8">
-                <span>Name: {patient.name}</span>
-                <span>Age: {patient.age}</span>
-                <span className="relative -top-[4px]">Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
-              </div>
-              <div className="pr-8 relative -top-[4px]">Date: {new Date(prescription.date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}</div>
+              {settings.printLayout.pageSize === 'A4' ? (
+                <div className="flex justify-between w-full px-8">
+                  <span>Name: {patient.name}</span>
+                  <span>Age: {patient.age}</span>
+                  <span className="relative -top-[4px]">Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
+                  <span className="relative -top-[4px]">Date: {new Date(prescription.date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-20 pl-8">
+                    <span>Name: {patient.name}</span>
+                    <span>Age: {patient.age}</span>
+                    <span className="relative -top-[4px]">Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
+                  </div>
+                  <div className="pr-8 relative -top-[4px]">Date: {new Date(prescription.date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}</div>
+                </>
+              )}
             </div>
           </div>
           <div className="rx-body">
