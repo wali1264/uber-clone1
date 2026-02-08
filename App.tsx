@@ -201,6 +201,10 @@ const App: React.FC = () => {
     setPatients(prev => prev.map(p => p.id === pid ? { ...p, ...updates } : p));
   };
 
+  const handleUpdateTemplatePrescription = (prid: string, updates: Partial<Prescription>) => {
+    setTemplatePrescriptions(prev => prev.map(t => t.id === prid ? { ...t, ...updates } : t));
+  };
+
   const handleSaveToTemplates = (pr: Prescription) => {
     const isDuplicate = templatePrescriptions.some(t => 
       t.diagnosis === pr.diagnosis && 
@@ -389,26 +393,38 @@ const App: React.FC = () => {
                         <div className="flex-1 pr-4">
                           <b className="text-indigo-900 block mb-3">{pr.diagnosis || 'نسخه آماده'}</b>
                           
-                          {/* Editable Section for Templates Only */}
+                          {/* Only Age and Date are editable in this section */}
                           <div className="bg-gray-50/50 p-3 rounded-2xl border border-dashed border-indigo-100 space-y-2 mb-3">
                              <div className="flex items-center gap-2">
                                 <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">اسم مریض:</span>
-                                <input 
-                                   className="flex-1 text-right text-xs font-bold text-slate-700 bg-white rounded-lg px-2 py-1.5 border border-indigo-50 focus:border-indigo-400 outline-none transition-all"
-                                   value={p?.name || ''}
-                                   onChange={(e) => handleUpdatePatientInfo(pr.patientId, { name: e.target.value })}
-                                />
+                                <span className="flex-1 text-right text-xs font-bold text-slate-700 bg-gray-100/50 rounded-lg px-2 py-1.5 border border-transparent">
+                                   {p?.name || 'بدون نام'}
+                                </span>
                              </div>
                              <div className="flex items-center gap-2">
                                 <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">جنسیت:</span>
-                                <select 
-                                   className="flex-1 text-right text-[10px] text-slate-600 bg-white rounded-lg px-2 py-1.5 border border-indigo-50 focus:border-indigo-400 outline-none cursor-pointer"
-                                   value={p?.gender || 'male'}
-                                   onChange={(e) => handleUpdatePatientInfo(pr.patientId, { gender: e.target.value as any })}
-                                >
-                                   <option value="male">مذکر</option>
-                                   <option value="female">مونث</option>
-                                </select>
+                                <span className="flex-1 text-right text-[10px] text-slate-600 bg-gray-100/50 rounded-lg px-2 py-1.5 border border-transparent">
+                                   {p?.gender === 'male' ? 'مذکر' : 'مونث'}
+                                </span>
+                             </div>
+                             {/* Editable Field: Age */}
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">سن:</span>
+                                <input 
+                                   className="flex-1 text-right text-xs font-bold text-indigo-700 bg-white rounded-lg px-2 py-1.5 border border-indigo-200 focus:border-indigo-500 outline-none transition-all"
+                                   value={p?.age || ''}
+                                   onChange={(e) => handleUpdatePatientInfo(pr.patientId, { age: e.target.value })}
+                                />
+                             </div>
+                             {/* Editable Field: Date */}
+                             <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">تاریخ:</span>
+                                <input 
+                                   type="date"
+                                   className="flex-1 text-right text-xs font-bold text-indigo-700 bg-white rounded-lg px-2 py-1.5 border border-indigo-200 focus:border-indigo-500 outline-none transition-all"
+                                   value={new Date(pr.date).toISOString().split('T')[0]}
+                                   onChange={(e) => handleUpdateTemplatePrescription(pr.id, { date: new Date(e.target.value).getTime() })}
+                                />
                              </div>
                           </div>
 
@@ -926,13 +942,13 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
         }}>
           <div className="rx-header">
             <div className={`${settings.printLayout.pageSize === 'A5' ? 'h-[2.5cm]' : 'h-[4cm]'} w-full`}></div>
-            <div className={`flex justify-between items-baseline pb-2 mb-2 text-[11pt] font-bold ${settings.printLayout.pageSize === 'A5' ? 'mt-4' : 'mt-8'}`} style={{ direction: 'ltr' }}>
+            <div className={`flex justify-between items-center pb-2 mb-2 text-[11pt] font-bold ${settings.printLayout.pageSize === 'A5' ? 'mt-4' : 'mt-8'}`} style={{ direction: 'ltr' }}>
               {settings.printLayout.pageSize === 'A4' ? (
                 <div className="flex justify-between w-full px-8">
                   <span>Name: {patient.name}</span>
                   <span>Age: {patient.age}</span>
-                  <span className="relative -top-[4px]">Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
-                  <span className="relative -top-[4px]">Date: {new Date(prescription.date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
+                  <span>Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
+                  <span>Date: {new Date(prescription.date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
                 </div>
               ) : (
                 <>
