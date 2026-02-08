@@ -393,19 +393,28 @@ const App: React.FC = () => {
                         <div className="flex-1 pr-4">
                           <b className="text-indigo-900 block mb-3">{pr.diagnosis || 'نسخه آماده'}</b>
                           
-                          {/* Only Age and Date are editable in this section */}
+                          {/* Name, Gender, Age and Date are editable in this section */}
                           <div className="bg-gray-50/50 p-3 rounded-2xl border border-dashed border-indigo-100 space-y-2 mb-3">
+                             {/* Editable Field: Name */}
                              <div className="flex items-center gap-2">
                                 <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">اسم مریض:</span>
-                                <span className="flex-1 text-right text-xs font-bold text-slate-700 bg-gray-100/50 rounded-lg px-2 py-1.5 border border-transparent">
-                                   {p?.name || 'بدون نام'}
-                                </span>
+                                <input 
+                                   className="flex-1 text-right text-xs font-bold text-indigo-700 bg-white rounded-lg px-2 py-1.5 border border-indigo-200 focus:border-indigo-500 outline-none transition-all"
+                                   value={p?.name || ''}
+                                   onChange={(e) => handleUpdatePatientInfo(pr.patientId, { name: e.target.value })}
+                                />
                              </div>
+                             {/* Editable Field: Gender */}
                              <div className="flex items-center gap-2">
                                 <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">جنسیت:</span>
-                                <span className="flex-1 text-right text-[10px] text-slate-600 bg-gray-100/50 rounded-lg px-2 py-1.5 border border-transparent">
-                                   {p?.gender === 'male' ? 'مذکر' : 'مونث'}
-                                </span>
+                                <select 
+                                   className="flex-1 text-right text-[10px] text-indigo-700 bg-white rounded-lg px-2 py-1.5 border border-indigo-200 focus:border-indigo-500 outline-none transition-all"
+                                   value={p?.gender || 'male'}
+                                   onChange={(e) => handleUpdatePatientInfo(pr.patientId, { gender: e.target.value as any })}
+                                >
+                                   <option value="male">مذکر</option>
+                                   <option value="female">مونث</option>
+                                </select>
                              </div>
                              {/* Editable Field: Age */}
                              <div className="flex items-center gap-2">
