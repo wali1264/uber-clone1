@@ -1,5 +1,7 @@
 {
-  "name": "Afghan-Labaik Travel Management Dashboard 6",
-  "description": "A professional management dashboard for travel agencies specializing in Hajj and Umrah services, featuring financial tracking and trip statistics.",
-  "requestFramePermissions": []
+  "name": "Asan Noskha - Afghan Doctor's Assistant 40",
+  "description": "A lightweight, fast prescription management tool for doctors in Afghanistan, featuring patient tracking, drug management, and quick prescription generation.",
+  "requestFramePermissions": [
+    "camera"
+  ]
 }
