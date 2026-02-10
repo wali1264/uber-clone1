@@ -4,150 +4,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>آسان نسخه - سیستم مدیریت نسخه‌های طبی</title>
+    <title>پنل مدیریت شرکت سیاحتی افغان-لبیک</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100;400;700&display=swap" rel="stylesheet">
     <style>
       body {
         font-family: 'Vazirmatn', sans-serif;
         background-color: #f8fafc;
-        margin: 0;
-        padding: 0;
-      }
-      .fade-in { animation: fadeIn 0.3s ease-in-out; }
-      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-      
-      /* حالت عادی */
-      #print-area {
-        width: 210mm;
-        min-height: 297mm;
-        padding: 5mm 10mm 10mm 2mm;
-        background: #fff;
-        color: #000;
-        font-size: 14px;
-        margin: auto;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-      }
-
-      /* تنظیمات مخصوص چاپ */
-      @media print {
-        body * {
-          visibility: hidden;
-        }
-
-        #print-area, #print-area * {
-          visibility: visible;
-        }
-
-        #print-area {
-          position: absolute;
-          left: 0;
-          top: 0;
-          margin: 0;
-          padding: 5mm 10mm 10mm 2mm;
-          display: flex;
-          flex-direction: column;
-          box-shadow: none !important;
-          overflow: hidden; /* جلوگیری از تولید صفحه دوم */
-        }
-
-        @page {
-          margin: 0;
-        }
-      }
-
-      .rx-header {
-        width: 100%;
-        padding-bottom: 5mm;
-        margin-bottom: 5mm;
-        text-align: center;
-      }
-      .rx-body {
-        display: flex;
-        flex-direction: row-reverse;
-        flex: 1;
-        min-height: 180mm;
-      }
-      .rx-sidebar {
-        width: 35mm;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 5mm;
-        text-align: center;
-        border-right: 0.1mm solid #eee;
-      }
-      .rx-main {
-        flex: 1;
-        padding: 0 10mm 0 8mm;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-      }
-      .rx-symbol-large {
-        font-size: 40pt;
-        font-family: serif;
-        font-weight: bold;
-        font-style: italic;
-      }
-      .meds-list {
-        margin-top: 10mm;
-        list-style: none;
-        padding: 0;
-        direction: ltr;
-        text-align: left;
-      }
-      .med-item {
-        margin-bottom: 4mm;
-      }
-      .rx-footer {
-        width: 100%;
-        padding-top: 5mm;
-        margin-top: auto;
-        text-align: center;
-        font-weight: bold;
-      }
-
-      .preview-modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: #e2e8f0;
-        z-index: 1000;
-        display: flex;
-        flex-direction: column;
-        overflow-y: auto;
-      }
-      .preview-header-ui {
-        background: white;
-        padding: 1rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 1px solid #cbd5e1;
-        position: sticky;
-        top: 0;
-        z-index: 1001;
-      }
-      .preview-content {
-        padding: 2rem;
-        display: flex;
-        justify-content: center;
       }
     </style>
-    <script type="importmap">
-    {
-      "imports": {
-        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-        "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-        "react/": "https://esm.sh/react@^19.2.3/",
-        "react": "https://esm.sh/react@^19.2.3"
-      }
-    }
-    </script>
-  <link rel="stylesheet" href="/index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>
