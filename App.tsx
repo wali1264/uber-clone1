@@ -120,7 +120,6 @@ const App: React.FC = () => {
           
           if (currentCount < TARGET_COUNT) {
             setIsDbPopulating(true);
-            // Put initial drugs first
             INITIAL_DRUGS.forEach(d => store.put({ ...d, name_lower: d.name.toLowerCase() }));
             
             const forms = ['Tab ', 'Syr ', 'Inj ', 'Cap ', 'Drops ', 'Cream ', 'Oint ', 'Spray ', 'Susp ', 'Gel '];
@@ -420,12 +419,12 @@ const App: React.FC = () => {
                              <div className="flex items-center gap-2">
                                 <span className="text-[10px] text-indigo-400 font-bold whitespace-nowrap">جنسیت:</span>
                                 <select 
-                                   className="flex-1 text-right text-[10px] text-indigo-700 bg-white rounded-lg px-2 py-1.5 border border-indigo-200 focus:border-indigo-500 outline-none transition-all"
+                                   className="flex-1 text-right text-xs font-bold text-indigo-700 bg-white rounded-lg px-2 py-1.5 border border-indigo-200 focus:border-indigo-500 outline-none transition-all"
                                    value={p?.gender || 'male'}
                                    onChange={(e) => handleTemplatePatientClone(pr.id, pr.patientId, { gender: e.target.value as any })}
                                 >
-                                   <option value="male">مذکر</option>
-                                   <option value="female">مونث</option>
+                                   <option value="male">مذکر (Male)</option>
+                                   <option value="female">مونث (Female)</option>
                                 </select>
                              </div>
                              <div className="flex items-center gap-2">
@@ -566,8 +565,21 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const [showCustomOnly, setShowCustomOnly] = useState(false);
   const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const [customCCs, setCustomCCs] = useState<string[]>(() => JSON.parse(localStorage.getItem('customCCs') || '[]'));
+  const [customDiagnoses, setCustomDiagnoses] = useState<string[]>(() => JSON.parse(localStorage.getItem('customDiagnoses') || '[]'));
+  const [newCCInput, setNewCCInput] = useState('');
+  const [newDiagInput, setNewDiagInput] = useState('');
   
   const [allCustomDrugs, setAllCustomDrugs] = useState<any[]>(INITIAL_DRUGS);
+
+  useEffect(() => {
+    localStorage.setItem('customCCs', JSON.stringify(customCCs));
+  }, [customCCs]);
+
+  useEffect(() => {
+    localStorage.setItem('customDiagnoses', JSON.stringify(customDiagnoses));
+  }, [customDiagnoses]);
 
   useEffect(() => {
     if (!db) return;
@@ -654,6 +666,20 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     });
   };
 
+  const addCustomCC = () => {
+    if (newCCInput && !customCCs.includes(newCCInput)) {
+      setCustomCCs([...customCCs, newCCInput]);
+      setNewCCInput('');
+    }
+  };
+
+  const addCustomDiag = () => {
+    if (newDiagInput && !customDiagnoses.includes(newDiagInput)) {
+      setCustomDiagnoses([...customDiagnoses, newDiagInput]);
+      setNewDiagInput('');
+    }
+  };
+
   const handleAddManualDrug = async () => {
     if (!manualDrug.name) return;
     const newId = `custom-${Date.now()}`;
@@ -727,8 +753,14 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
           شکایت مریض (Chief Complain) <Activity className="w-4 h-4" />
         </label>
         <textarea className="w-full p-4 bg-gray-50 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-indigo-100 min-h-[80px]" placeholder="علائم مریض..." value={cc} onChange={e => setCc(e.target.value)} />
+        
+        <div className="flex gap-2 justify-end mb-2">
+           <input className="flex-1 max-w-[150px] p-2 bg-gray-50 border rounded-xl text-[10px] outline-none" placeholder="شکایت جدید..." value={newCCInput} onChange={e => setNewCCInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomCC()} />
+           <button onClick={addCustomCC} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"><Plus className="w-4 h-4" /></button>
+        </div>
+
         <div className="flex flex-wrap gap-1 justify-end">
-          {MEDICAL_CC_CATEGORIES.flatMap(cat => cat.items).map(item => (
+          {MEDICAL_CC_CATEGORIES.flatMap(cat => cat.items).concat(customCCs).map(item => (
             <button key={item} onClick={() => toggleCC(item)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${cc.includes(item) ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{item}</button>
           ))}
         </div>
@@ -739,8 +771,14 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
           تشخیص مریض (Diagnosis) <FileText className="w-4 h-4" />
         </label>
         <input className="w-full p-4 bg-gray-50 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Diagnosis..." value={diag} onChange={e => setDiag(e.target.value)} />
+        
+        <div className="flex gap-2 justify-end mb-2">
+           <input className="flex-1 max-w-[150px] p-2 bg-gray-50 border rounded-xl text-[10px] outline-none" placeholder="تشخیص جدید..." value={newDiagInput} onChange={e => setNewDiagInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCustomDiag()} />
+           <button onClick={addCustomDiag} className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all"><Plus className="w-4 h-4" /></button>
+        </div>
+
         <div className="flex flex-wrap gap-1 justify-end">
-          {MEDICAL_DIAGNOSES.flatMap(cat => cat.items).map(item => (
+          {MEDICAL_DIAGNOSES.flatMap(cat => cat.items).concat(customDiagnoses).map(item => (
             <button key={item} onClick={() => toggleDiag(item)} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${diag.includes(item) ? 'bg-indigo-600 text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>{item}</button>
           ))}
         </div>
@@ -1029,14 +1067,14 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
             <div className="rx-main">
               <ul className="meds-list" style={{ 
                 marginTop: settings.printLayout.pageSize === 'A5' ? '0' : '10mm',
-                paddingLeft: settings.printLayout.pageSize === 'A4' ? '3ch' : '0'
+                paddingLeft: settings.printLayout.pageSize === 'A4' ? '15ch' : '0'
               }}>
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item mb-5">
-                    <div className="font-bold text-[12pt] flex items-baseline gap-12">
+                    <div className={`font-bold text-[12pt] flex items-baseline ${settings.printLayout.pageSize === 'A4' ? 'gap-[15ch]' : 'gap-12'}`}>
                       <span>{idx + 1}. {m.name} {m.strength}</span>
                       {m.quantity && m.quantity !== '1' && (
-                        <span className="font-normal text-[11pt]">
+                        <span className="font-normal text-[11pt] whitespace-nowrap">
                           {settings.printLayout.pageSize === 'A4' ? `N ${m.quantity}` : `N: ${m.quantity}`}
                         </span>
                       )}
