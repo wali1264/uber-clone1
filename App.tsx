@@ -116,28 +116,28 @@ const App: React.FC = () => {
         
         countReq.onsuccess = () => {
           const currentCount = countReq.result;
-          const TARGET_COUNT = 500000;
+          const TARGET_COUNT = 1000000;
           
           if (currentCount < TARGET_COUNT) {
             setIsDbPopulating(true);
             INITIAL_DRUGS.forEach(d => store.put({ ...d, name_lower: d.name.toLowerCase() }));
             
-            const forms = ['Tab ', 'Syr ', 'Inj ', 'Cap ', 'Drops ', 'Cream ', 'Oint ', 'Spray ', 'Susp ', 'Gel '];
-            const stems = ['Amoxi', 'Cipro', 'Levo', 'Atorva', 'Omepra', 'Paraceta', 'Ibupro', 'Azithro', 'Ceftri', 'Metroni', 'Losar', 'Amlodi', 'Bisopro', 'Panto', 'Esomep', 'Diclo', 'Napro', 'Mefena', 'Celeco', 'Trana', 'Keto', 'Melo', 'Indo', 'Fluco', 'Clarithro', 'Roxy', 'Terbi', 'Ketoco', 'Predni', 'Dexa', 'Hydro', 'Betame'];
-            const suffixes = ['cillin', 'floxacin', 'statin', 'zole', 'mol', 'fen', 'mycin', 'axone', 'dazole', 'tan', 'pine', 'lol', 'prazole', 'nac', 'xen', 'mic', 'nib', 'mab', 'sone', 'lone', 'line', 'zine', 'mine', 'pril'];
-            const categories = ['Analgesic', 'Antibiotic', 'Gastro', 'Cardiac', 'Dermatology', 'Neurology', 'Vitamin', 'Respiratory', 'Pediatric'];
+            const forms = ['Tab ', 'Syr ', 'Inj ', 'Cap ', 'Drops ', 'Cream ', 'Oint ', 'Spray ', 'Susp ', 'Gel ', 'Vial ', 'Amp ', 'Powder ', 'Sachet ', 'Lotion ', 'Solution '];
+            const stems = ['Amoxi', 'Cipro', 'Levo', 'Atorva', 'Omepra', 'Paraceta', 'Ibupro', 'Azithro', 'Ceftri', 'Metroni', 'Losar', 'Amlodi', 'Bisopro', 'Panto', 'Esomep', 'Diclo', 'Napro', 'Mefena', 'Celeco', 'Trana', 'Keto', 'Melo', 'Indo', 'Fluco', 'Clarithro', 'Roxy', 'Terbi', 'Ketoco', 'Predni', 'Dexa', 'Hydro', 'Betame', 'Valsar', 'Olme', 'Irbes', 'Telmi', 'Ramip', 'Enala', 'Lisino', 'Metfor', 'Sitagl', 'Rosuva', 'Simva', 'Feno', 'Gemfi', 'Warfa', 'Clopido', 'Aspirin'];
+            const suffixes = ['cillin', 'floxacin', 'statin', 'zole', 'mol', 'fen', 'mycin', 'axone', 'dazole', 'tan', 'pine', 'lol', 'prazole', 'nac', 'xen', 'mic', 'nib', 'mab', 'sone', 'lone', 'line', 'zine', 'mine', 'pril', 'sartan', 'grel', 'ban', 'tide', 'gliflo', 'vudine', 'vir'];
+            const categories = ['Analgesic', 'Antibiotic', 'Gastro', 'Cardiac', 'Dermatology', 'Neurology', 'Vitamin', 'Respiratory', 'Pediatric', 'Endocrine', 'Urology', 'Orthopaedic'];
             
             let i = currentCount;
             const populateBatch = () => {
               const txBatch = database.transaction(DRUG_STORE, 'readwrite');
               const storeBatch = txBatch.objectStore(DRUG_STORE);
-              const batchLimit = Math.min(i + 5000, TARGET_COUNT); 
+              const batchLimit = Math.min(i + 8000, TARGET_COUNT); 
               
               for (; i < batchLimit; i++) {
                 const form = forms[i % forms.length];
                 const stem = stems[i % stems.length];
                 const suffix = suffixes[i % suffixes.length];
-                const name = `${form}${stem}${suffix}-${i}`;
+                const name = `${form}${stem}${suffix}`;
                 
                 storeBatch.put({
                   id: `gen-${i}`,
@@ -150,7 +150,7 @@ const App: React.FC = () => {
               }
               
               if (i < TARGET_COUNT) {
-                setTimeout(populateBatch, 10);
+                setTimeout(populateBatch, 5);
               } else {
                 setIsDbPopulating(false);
               }
@@ -284,7 +284,7 @@ const App: React.FC = () => {
 
       {isDbPopulating && (
         <div className="bg-amber-50 text-amber-800 px-4 py-1 text-[10px] text-center font-bold no-print animate-pulse">
-          در حال آماده‌سازی ۵۰۰,۰۰۰ قلم داروی متنوع... لطفاً کمی صبر کنید.
+          در حال آماده‌سازی قلم‌های داروی متنوع... لطفاً کمی صبر کنید.
         </div>
       )}
 
@@ -448,7 +448,6 @@ const App: React.FC = () => {
                              </div>
                           </div>
 
-                          <div className="text-[10px] text-gray-400 mt-1">{pr.medications.length} قلم دوا در این الگو موجود است</div>
                           <div className="mt-2 flex flex-wrap gap-1 justify-end">
                             {pr.medications.slice(0, 3).map((m, idx) => (
                               <span key={idx} className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded text-[8px]">{m.name}</span>
@@ -1071,10 +1070,12 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
               }}>
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item mb-5">
-                    <div className={`font-bold text-[12pt] flex items-baseline ${settings.printLayout.pageSize === 'A4' ? 'gap-[15ch]' : 'gap-12'}`}>
-                      <span>{idx + 1}. {m.name} {m.strength}</span>
+                    <div className={`font-bold text-[12pt] flex items-baseline ${settings.printLayout.pageSize === 'A4' ? 'w-full justify-between' : 'gap-12'}`}>
+                      <span className={settings.printLayout.pageSize === 'A4' ? 'flex-1' : ''}>
+                        {m.name} {m.strength}
+                      </span>
                       {m.quantity && m.quantity !== '1' && (
-                        <span className="font-normal text-[11pt] whitespace-nowrap">
+                        <span className={`font-normal text-[11pt] whitespace-nowrap ${settings.printLayout.pageSize === 'A4' ? 'w-[40mm] text-right' : ''}`}>
                           {settings.printLayout.pageSize === 'A4' ? `N ${m.quantity}` : `N: ${m.quantity}`}
                         </span>
                       )}
