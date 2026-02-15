@@ -1065,7 +1065,7 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
             </div>
             <div className="rx-main">
               <ul className="meds-list" style={{ 
-                marginTop: settings.printLayout.pageSize === 'A5' ? '0' : '10mm',
+                marginTop: settings.printLayout.pageSize === 'A5' ? '0' : '14mm', // Adjusted margin to 14mm for A4 to prevent drug list from starting higher than BP
                 paddingLeft: settings.printLayout.pageSize === 'A4' ? '15ch' : '0'
               }}>
                 {prescription.medications.map((m: any, idx: number) => (
