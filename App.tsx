@@ -45,7 +45,7 @@ declare const mammoth: any;
 
 // --- Database Configuration ---
 const DB_NAME = 'AsanNoskhaProfessionalDB';
-const DB_VERSION = 2; 
+const DB_VERSION = 6; // Bumped version for numeric favorite index optimization
 const DRUG_STORE = 'drugs_master';
 
 const initDB = (): Promise<IDBDatabase> => {
@@ -57,10 +57,14 @@ const initDB = (): Promise<IDBDatabase> => {
         const store = db.createObjectStore(DRUG_STORE, { keyPath: 'id' });
         store.createIndex('name', 'name', { unique: false });
         store.createIndex('name_lower', 'name_lower', { unique: false });
+        store.createIndex('isFavorite', 'isFavorite', { unique: false });
       } else {
-        const store = request.transaction!.objectStore(DRUG_STORE);
+        const store = (event.target as IDBOpenDBRequest).transaction!.objectStore(DRUG_STORE);
         if (!store.indexNames.contains('name_lower')) {
           store.createIndex('name_lower', 'name_lower', { unique: false });
+        }
+        if (!store.indexNames.contains('isFavorite')) {
+          store.createIndex('isFavorite', 'isFavorite', { unique: false });
         }
       }
     };
@@ -116,11 +120,11 @@ const App: React.FC = () => {
         
         countReq.onsuccess = () => {
           const currentCount = countReq.result;
-          const TARGET_COUNT = 500000; // Updated to 500,000 as requested
+          const TARGET_COUNT = 500000; 
           
           if (currentCount < TARGET_COUNT) {
             setIsDbPopulating(true);
-            INITIAL_DRUGS.forEach(d => store.put({ ...d, name_lower: d.name.toLowerCase() }));
+            INITIAL_DRUGS.forEach(d => store.put({ ...d, name_lower: d.name.toLowerCase(), isFavorite: 0 }));
             
             const forms = ['Tab ', 'Syr ', 'Inj ', 'Cap ', 'Drops ', 'Cream ', 'Oint ', 'Spray ', 'Susp ', 'Gel ', 'Vial ', 'Amp ', 'Powder ', 'Sachet ', 'Lotion ', 'Solution '];
             const stems = ['Amoxi', 'Cipro', 'Levo', 'Atorva', 'Omepra', 'Paraceta', 'Ibupro', 'Azithro', 'Ceftri', 'Metroni', 'Losar', 'Amlodi', 'Bisopro', 'Panto', 'Esomep', 'Diclo', 'Napro', 'Mefena', 'Celeco', 'Trana', 'Keto', 'Melo', 'Indo', 'Fluco', 'Clarithro', 'Roxy', 'Terbi', 'Ketoco', 'Predni', 'Dexa', 'Hydro', 'Betame', 'Valsar', 'Olme', 'Irbes', 'Telmi', 'Ramip', 'Enala', 'Lisino', 'Metfor', 'Sitagl', 'Rosuva', 'Simva', 'Feno', 'Gemfi', 'Warfa', 'Clopido', 'Aspirin'];
@@ -131,7 +135,7 @@ const App: React.FC = () => {
             const populateBatch = () => {
               const txBatch = database.transaction(DRUG_STORE, 'readwrite');
               const storeBatch = txBatch.objectStore(DRUG_STORE);
-              const batchLimit = Math.min(i + 8000, TARGET_COUNT); 
+              const batchLimit = Math.min(i + 15000, TARGET_COUNT); 
               
               for (; i < batchLimit; i++) {
                 const form = forms[i % forms.length];
@@ -145,12 +149,13 @@ const App: React.FC = () => {
                   name_lower: name.toLowerCase(),
                   category: categories[i % categories.length],
                   defaultStrength: `${((i % 20) + 1) * 25}mg`,
-                  defaultInstructions: 'Once daily'
+                  defaultInstructions: 'Once daily',
+                  isFavorite: 0 // Numeric 0 for false
                 });
               }
               
               if (i < TARGET_COUNT) {
-                setTimeout(populateBatch, 5);
+                setTimeout(populateBatch, 1);
               } else {
                 setIsDbPopulating(false);
               }
@@ -284,7 +289,7 @@ const App: React.FC = () => {
 
       {isDbPopulating && (
         <div className="bg-amber-50 text-amber-800 px-4 py-1 text-[10px] text-center font-bold no-print animate-pulse">
-          در حال آماده‌سازی قلم‌های داروی متنوع... لطفاً کمی صبر کنید.
+          در حال آماده‌سازی ۵۰۰ هزار قلم دارو... لطفاً کمی صبر کنید.
         </div>
       )}
 
@@ -612,7 +617,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     const searchLower = search.toLowerCase();
     let base = allCustomDrugs;
     if (showFavoritesOnly) {
-      base = base.filter(d => d.isFavorite);
+      base = base.filter(d => d.isFavorite === 1);
     }
     return base
       .filter(d => !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower)))
@@ -628,16 +633,64 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     if (!db) return;
     const searchLower = search.toLowerCase();
 
-    if (showCustomOnly || showFavoritesOnly) {
+    const tx = db.transaction(DRUG_STORE, 'readonly');
+    const store = tx.objectStore(DRUG_STORE);
+    const results: any[] = [];
+
+    if (showFavoritesOnly) {
+      try {
+        const favIndex = store.index('isFavorite');
+        const request = favIndex.openCursor(IDBKeyRange.only(1)); // Query numeric favorite=1
+        request.onsuccess = (e: any) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const d = cursor.value;
+            const matchSearch = !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower));
+            if (matchSearch) results.push(d);
+            cursor.continue();
+          } else {
+            setDrugResults(results);
+          }
+        };
+        request.onerror = () => {
+          store.openCursor().onsuccess = (e: any) => {
+            const cursor = e.target.result;
+            if (cursor) {
+              if (cursor.value.isFavorite === 1) {
+                const d = cursor.value;
+                const matchSearch = !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower));
+                if (matchSearch) results.push(d);
+              }
+              cursor.continue();
+            } else {
+              setDrugResults(results);
+            }
+          };
+        };
+      } catch (e) {
+        store.openCursor().onsuccess = (e: any) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            if (cursor.value.isFavorite === 1) {
+              const d = cursor.value;
+              const matchSearch = !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower));
+              if (matchSearch) results.push(d);
+            }
+            cursor.continue();
+          } else {
+            setDrugResults(results);
+          }
+        };
+      }
+      return;
+    }
+
+    if (showCustomOnly) {
       setDrugResults(filteredCustomDrugs);
       return;
     }
 
-    const tx = db.transaction(DRUG_STORE, 'readonly');
-    const store = tx.objectStore(DRUG_STORE);
     const index = store.index('name_lower');
-    const results: any[] = [];
-    
     if (searchLower) {
       const range = IDBKeyRange.bound(searchLower, searchLower + '\uffff');
       index.openCursor(range).onsuccess = (e: any) => {
@@ -686,7 +739,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
 
   const handleToggleFavorite = async (e: React.MouseEvent, drug: any) => {
     e.stopPropagation();
-    const updated = { ...drug, isFavorite: !drug.isFavorite };
+    const updated = { ...drug, isFavorite: drug.isFavorite === 1 ? 0 : 1 };
     const tx = db.transaction(DRUG_STORE, 'readwrite');
     tx.objectStore(DRUG_STORE).put(updated).onsuccess = () => {
       setRefreshTrigger(prev => prev + 1);
@@ -703,7 +756,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
       defaultStrength: manualDrug.strength,
       defaultInstructions: manualDrug.instructions,
       category: manualDrug.category,
-      isFavorite: false
+      isFavorite: 0
     };
     
     try {
@@ -744,7 +797,6 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     'As needed (PRN)'
   ];
   const QUICK_DOSES = ['1 Tablet', '1/2 Tablet', '2 Tablets', '5 ml', '10 ml', '1 Ampoule', '1 Teaspoon', 'As directed'];
-  const ADMINISTRATION_ROUTES = ['PO', 'IM', 'IV'];
 
   return (
     <div className="space-y-6 pb-12 fade-in">
@@ -803,9 +855,24 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-indigo-700 flex items-center gap-2">دواهای تجویزی <Database className="w-4 h-4" /></h3>
             <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
-              <button onClick={() => { setShowCustomOnly(false); setShowFavoritesOnly(false); setSearch('Tab '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-bold border border-blue-100">سرچ تابلیت</button>
-              <button onClick={() => { setShowCustomOnly(false); setShowFavoritesOnly(false); setSearch('Cap '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[9px] font-bold border border-amber-100">سرچ کپسول</button>
-              <button onClick={() => { setShowCustomOnly(false); setShowFavoritesOnly(false); setSearch('Syp '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-bold border border-emerald-100">سرچ شربت</button>
+              <select 
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setShowCustomOnly(false); 
+                    setShowFavoritesOnly(false); 
+                    setSearch(e.target.value);
+                  }
+                }}
+                className="whitespace-nowrap px-2.5 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg text-[9px] font-bold border border-indigo-100 outline-none cursor-pointer"
+              >
+                <option value="">سرچ بر اساس نوع...</option>
+                <option value="Tab ">تابلیت (Tab)</option>
+                <option value="Cap ">کپسول (Cap)</option>
+                <option value="Syp ">شربت (Syp)</option>
+                <option value="Inj ">پیچکاری (Inj)</option>
+                <option value="Amp ">آمپول (Amp)</option>
+                <option value="Drop ">قطره (Drop)</option>
+              </select>
               <button onClick={() => setIsAddingManual(true)} className="whitespace-nowrap px-2.5 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-[9px] font-bold border border-rose-100">افزودن دارو خود ما</button>
               <button onClick={() => { setShowCustomOnly(!showCustomOnly); setShowFavoritesOnly(false); }} className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${showCustomOnly ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>انتخاب دارو خود ما</button>
               <button onClick={() => { setShowFavoritesOnly(!showFavoritesOnly); setShowCustomOnly(false); }} className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${showFavoritesOnly ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>انتخاب دوای دلخواه</button>
@@ -850,8 +917,8 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
                 <span className="text-[10px] bg-white px-2 py-0.5 rounded-full text-indigo-400 font-mono">{d.category}</span>
                 <span className="font-bold">{d.name} <span className="text-gray-400 text-xs font-normal">({d.defaultStrength})</span></span>
               </button>
-              <button onClick={(e) => handleToggleFavorite(e, d)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white rounded-full transition-all">
-                <Star className={`w-4 h-4 ${d.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+              <button onClick={(e) => handleToggleFavorite(e, d)} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-white rounded-full transition-all group-hover:scale-110" title="تغییر وضعیت دلخواه">
+                <Star className={`w-5 h-5 ${d.isFavorite === 1 ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
               </button>
             </div>
           ))}
@@ -881,18 +948,6 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
                       <button key={opt} onClick={() => appendInstructionPart(i, opt)} className="text-[8px] bg-white/80 px-1.5 py-0.5 rounded border border-indigo-100 hover:bg-white transition-colors">{opt}</button>
                     ))}
                   </div>
-                  <div className="flex flex-wrap gap-1 mt-1 border-t border-indigo-100 pt-1">
-                    {ADMINISTRATION_ROUTES.map(opt => {
-                      const nameLower = m.name.toLowerCase();
-                      const isPill = nameLower.includes('tab') || nameLower.includes('cap');
-                      const isOintment = nameLower.includes('cream') || nameLower.includes('oint');
-                      const hide = (opt === 'IM' && isPill) || (opt === 'IV' && isOintment);
-                      if (hide) return null;
-                      return (
-                        <button key={opt} onClick={() => appendInstructionPart(i, opt)} className="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded border border-indigo-700 hover:bg-indigo-700 transition-colors">{opt}</button>
-                      );
-                    })}
-                  </div>
                 </div>
               </div>
             </div>
@@ -911,6 +966,7 @@ const DrugSettings = ({ db }: any) => {
   const [drugs, setDrugs] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [newDrug, setNewDrug] = useState({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
 
@@ -919,10 +975,58 @@ const DrugSettings = ({ db }: any) => {
     const tx = db.transaction(DRUG_STORE, 'readonly');
     const store = tx.objectStore(DRUG_STORE);
     const searchLower = search.toLowerCase();
+    const results: any[] = [];
+
+    if (showFavoritesOnly) {
+      try {
+        const favIndex = store.index('isFavorite');
+        const request = favIndex.openCursor(IDBKeyRange.only(1)); // Query numeric 1
+        request.onsuccess = (e: any) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const d = cursor.value;
+            const matchSearch = !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower));
+            if (matchSearch) results.push(d);
+            cursor.continue();
+          } else {
+            setDrugs(results);
+          }
+        };
+        request.onerror = () => {
+          store.openCursor().onsuccess = (e: any) => {
+            const cursor = e.target.result;
+            if (cursor) {
+              if (cursor.value.isFavorite === 1) {
+                const d = cursor.value;
+                const matchSearch = !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower));
+                if (matchSearch) results.push(d);
+              }
+              cursor.continue();
+            } else {
+              setDrugs(results);
+            }
+          };
+        };
+      } catch (e) {
+        store.openCursor().onsuccess = (e: any) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            if (cursor.value.isFavorite === 1) {
+              const d = cursor.value;
+              const matchSearch = !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower));
+              if (matchSearch) results.push(d);
+            }
+            cursor.continue();
+          } else {
+            setDrugs(results);
+          }
+        };
+      }
+      return;
+    }
 
     if (searchLower) {
       const index = store.index('name_lower');
-      const results: any[] = [];
       const range = IDBKeyRange.bound(searchLower, searchLower + '\uffff');
       index.openCursor(range).onsuccess = (e: any) => {
         const cursor = e.target.result;
@@ -938,11 +1042,11 @@ const DrugSettings = ({ db }: any) => {
     }
   };
 
-  useEffect(() => { loadDrugs(); }, [db, search, refreshTrigger]);
+  useEffect(() => { loadDrugs(); }, [db, search, refreshTrigger, showFavoritesOnly]);
 
   const handleToggleFavorite = async (e: React.MouseEvent, drug: any) => {
     e.stopPropagation();
-    const updated = { ...drug, isFavorite: !drug.isFavorite };
+    const updated = { ...drug, isFavorite: drug.isFavorite === 1 ? 0 : 1 };
     const tx = db.transaction(DRUG_STORE, 'readwrite');
     tx.objectStore(DRUG_STORE).put(updated).onsuccess = () => {
       setRefreshTrigger(prev => prev + 1);
@@ -958,7 +1062,7 @@ const DrugSettings = ({ db }: any) => {
       defaultStrength: newDrug.strength,
       defaultInstructions: newDrug.instructions,
       category: newDrug.category,
-      isFavorite: false
+      isFavorite: 0
     };
     try {
       const tx = db.transaction(DRUG_STORE, 'readwrite');
@@ -989,11 +1093,16 @@ const DrugSettings = ({ db }: any) => {
       <h2 className="font-bold text-center text-indigo-900 border-b pb-4">بانک دواها</h2>
       
       <div className="flex flex-col gap-3">
-        {!isAdding ? (
-          <button onClick={() => setIsAdding(true)} className="w-full p-5 bg-indigo-50 text-indigo-700 rounded-3xl font-bold flex items-center justify-center gap-2 border border-indigo-100">
-            <PlusCircle className="w-5 h-5" /> افزودن دوا جدید
-          </button>
-        ) : (
+        <div className="flex gap-2">
+           <button onClick={() => setIsAdding(!isAdding)} className={`flex-1 p-5 rounded-3xl font-bold flex items-center justify-center gap-2 border transition-all ${isAdding ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>
+              <PlusCircle className="w-5 h-5" /> افزودن دوا جدید
+           </button>
+           <button onClick={() => setShowFavoritesOnly(!showFavoritesOnly)} className={`flex-1 p-5 rounded-3xl font-bold flex items-center justify-center gap-2 border transition-all ${showFavoritesOnly ? 'bg-amber-500 text-white border-amber-500 shadow-md' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+              <Star className={`w-5 h-5 ${showFavoritesOnly ? 'fill-white' : ''}`} /> داروهای دلخواه
+           </button>
+        </div>
+
+        {isAdding && (
           <div id="add-manual-section" className="bg-white p-6 rounded-3xl shadow-sm border border-indigo-100 space-y-4 fade-in">
             <div className="flex justify-between items-center mb-1">
               <button onClick={() => setIsAdding(false)} className="text-gray-400 p-1"><X className="w-5 h-5" /></button>
@@ -1025,7 +1134,7 @@ const DrugSettings = ({ db }: any) => {
 
       <div className="relative mt-4">
         <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input className="w-full p-4 pr-10 rounded-2xl bg-white border border-gray-100 outline-none focus:ring-2 focus:ring-indigo-100 shadow-sm text-sm" placeholder="جستجو در بانک دواها..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input className="w-full p-4 pr-10 rounded-2xl bg-white border border-gray-100 outline-none focus:ring-2 focus:ring-indigo-100 shadow-sm text-sm" placeholder={showFavoritesOnly ? "جستجو در داروهای دلخواه..." : "جستجو در بانک دواها..."} value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
       <div className="grid gap-2">
@@ -1049,8 +1158,8 @@ const DrugSettings = ({ db }: any) => {
                 <Copy className="w-4 h-4" />
                 <span className="text-[9px] font-bold">استفاده</span>
               </button>
-              <button onClick={(e) => handleToggleFavorite(e, d)} className="p-2.5 bg-amber-50 rounded-xl hover:bg-amber-100 transition-all">
-                <Star className={`w-4 h-4 ${d.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+              <button onClick={(e) => handleToggleFavorite(e, d)} className="p-3 bg-amber-50 rounded-xl hover:bg-amber-100 transition-all shadow-sm group-hover:scale-110" title="افزودن به دوای دلخواه">
+                <Star className={`w-6 h-6 ${d.isFavorite === 1 ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
               </button>
             </div>
             <div className="flex flex-col items-end">
@@ -1062,7 +1171,7 @@ const DrugSettings = ({ db }: any) => {
             </div>
           </div>
         ))}
-        {drugs.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">دارویی یافت نشد</div>}
+        {drugs.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">{showFavoritesOnly ? "هنوز دارویی را ستاره دار نکرده اید" : "دارویی یافت نشد"}</div>}
       </div>
     </div>
   );
@@ -1110,9 +1219,11 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
             <div className={`flex justify-between items-center pb-2 mb-2 text-[11pt] font-bold ${settings.printLayout.pageSize === 'A5' ? 'mt-4' : 'mt-8'}`} style={{ direction: 'ltr' }}>
               {settings.printLayout.pageSize === 'A4' ? (
                 <div className="flex justify-between w-full px-8">
-                  <span>Name: {patient.name}</span>
-                  <span>Age: {patient.age}</span>
-                  <span>Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
+                  <div className="flex gap-12">
+                    <span>Name: {patient.name}</span>
+                    <span>Age: {patient.age}</span>
+                    <span>Gender: {patient.gender === 'male' ? 'Male' : 'Female'}</span>
+                  </div>
                   <span>Date: {new Date(prescription.date).toLocaleDateString('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
                 </div>
               ) : (
