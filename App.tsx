@@ -116,7 +116,7 @@ const App: React.FC = () => {
         
         countReq.onsuccess = () => {
           const currentCount = countReq.result;
-          const TARGET_COUNT = 1000000;
+          const TARGET_COUNT = 500000; // Updated to 500,000 as requested
           
           if (currentCount < TARGET_COUNT) {
             setIsDbPopulating(true);
@@ -562,6 +562,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
   const [drugResults, setDrugResults] = useState<any[]>([]);
   const [isAddingManual, setIsAddingManual] = useState(false);
   const [showCustomOnly, setShowCustomOnly] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [manualDrug, setManualDrug] = useState({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -609,7 +610,11 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
 
   const filteredCustomDrugs = useMemo(() => {
     const searchLower = search.toLowerCase();
-    return allCustomDrugs
+    let base = allCustomDrugs;
+    if (showFavoritesOnly) {
+      base = base.filter(d => d.isFavorite);
+    }
+    return base
       .filter(d => !searchLower || (d.name_lower && d.name_lower.includes(searchLower)) || (d.name && d.name.toLowerCase().includes(searchLower)))
       .sort((a, b) => {
         if (a.id.startsWith('custom') && !b.id.startsWith('custom')) return -1;
@@ -617,13 +622,13 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
         return b.id.localeCompare(a.id);
       })
       .slice(0, 50);
-  }, [allCustomDrugs, search]);
+  }, [allCustomDrugs, search, showFavoritesOnly]);
 
   useEffect(() => {
     if (!db) return;
     const searchLower = search.toLowerCase();
 
-    if (showCustomOnly) {
+    if (showCustomOnly || showFavoritesOnly) {
       setDrugResults(filteredCustomDrugs);
       return;
     }
@@ -647,7 +652,7 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     } else {
       setDrugResults([]);
     }
-  }, [search, db, refreshTrigger, showCustomOnly, filteredCustomDrugs]);
+  }, [search, db, refreshTrigger, showCustomOnly, showFavoritesOnly, filteredCustomDrugs]);
 
   const toggleCC = (item: string) => {
     setCc(prev => {
@@ -679,6 +684,15 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
     }
   };
 
+  const handleToggleFavorite = async (e: React.MouseEvent, drug: any) => {
+    e.stopPropagation();
+    const updated = { ...drug, isFavorite: !drug.isFavorite };
+    const tx = db.transaction(DRUG_STORE, 'readwrite');
+    tx.objectStore(DRUG_STORE).put(updated).onsuccess = () => {
+      setRefreshTrigger(prev => prev + 1);
+    };
+  };
+
   const handleAddManualDrug = async () => {
     if (!manualDrug.name) return;
     const newId = `custom-${Date.now()}`;
@@ -688,7 +702,8 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
       name_lower: manualDrug.name.toLowerCase(),
       defaultStrength: manualDrug.strength,
       defaultInstructions: manualDrug.instructions,
-      category: manualDrug.category
+      category: manualDrug.category,
+      isFavorite: false
     };
     
     try {
@@ -788,16 +803,17 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-indigo-700 flex items-center gap-2">دواهای تجویزی <Database className="w-4 h-4" /></h3>
             <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
-              <button onClick={() => { setShowCustomOnly(false); setSearch('Tab '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-bold border border-blue-100">سرچ تابلیت</button>
-              <button onClick={() => { setShowCustomOnly(false); setSearch('Cap '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[9px] font-bold border border-amber-100">سرچ کپسول</button>
-              <button onClick={() => { setShowCustomOnly(false); setSearch('Syp '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-bold border border-emerald-100">سرچ شربت</button>
+              <button onClick={() => { setShowCustomOnly(false); setShowFavoritesOnly(false); setSearch('Tab '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-[9px] font-bold border border-blue-100">سرچ تابلیت</button>
+              <button onClick={() => { setShowCustomOnly(false); setShowFavoritesOnly(false); setSearch('Cap '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-[9px] font-bold border border-amber-100">سرچ کپسول</button>
+              <button onClick={() => { setShowCustomOnly(false); setShowFavoritesOnly(false); setSearch('Syp '); }} className="whitespace-nowrap px-2.5 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-bold border border-emerald-100">سرچ شربت</button>
               <button onClick={() => setIsAddingManual(true)} className="whitespace-nowrap px-2.5 py-1.5 bg-rose-50 text-rose-700 rounded-lg text-[9px] font-bold border border-rose-100">افزودن دارو خود ما</button>
-              <button onClick={() => setShowCustomOnly(!showCustomOnly)} className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${showCustomOnly ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>انتخاب دارو خود ما</button>
+              <button onClick={() => { setShowCustomOnly(!showCustomOnly); setShowFavoritesOnly(false); }} className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${showCustomOnly ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 text-indigo-700 border-indigo-100'}`}>انتخاب دارو خود ما</button>
+              <button onClick={() => { setShowFavoritesOnly(!showFavoritesOnly); setShowCustomOnly(false); }} className={`whitespace-nowrap px-2.5 py-1.5 rounded-lg text-[9px] font-bold border transition-all ${showFavoritesOnly ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>انتخاب دوای دلخواه</button>
             </div>
           </div>
           <div className="relative w-full">
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input id="drug-search-input" className="text-sm w-full py-3 pr-10 pl-3 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100" placeholder={showCustomOnly ? "جستجو در داروهای شخصی شما..." : "جستجوی دوا..."} value={search} onChange={e => setSearch(e.target.value)} />
+            <input id="drug-search-input" className="text-sm w-full py-3 pr-10 pl-3 border rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100" placeholder={showFavoritesOnly ? "جستجو در داروهای دلخواه..." : showCustomOnly ? "جستجو در داروهای شخصی شما..." : "جستجوی دوا..."} value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
 
@@ -829,10 +845,15 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
 
         <div className="space-y-1.5 max-h-[350px] overflow-y-auto pr-1">
           {drugResults.map(d => (
-            <button key={d.id} onClick={() => setMeds([...meds, { ...d, strength: d.defaultStrength, quantity: '1', instructions: d.defaultInstructions }])} className="w-full p-3 bg-gray-50 hover:bg-indigo-50 transition-all rounded-xl text-right text-sm border border-transparent hover:border-indigo-100 flex justify-between items-center">
-              <span className="text-[10px] bg-white px-2 py-0.5 rounded-full text-indigo-400 font-mono">{d.category}</span>
-              <span className="font-bold">{d.name} <span className="text-gray-400 text-xs font-normal">({d.defaultStrength})</span></span>
-            </button>
+            <div key={d.id} className="relative group">
+              <button onClick={() => setMeds([...meds, { ...d, strength: d.defaultStrength, quantity: '1', instructions: d.defaultInstructions }])} className="w-full p-3 bg-gray-50 hover:bg-indigo-50 transition-all rounded-xl text-right text-sm border border-transparent hover:border-indigo-100 flex justify-between items-center pr-10">
+                <span className="text-[10px] bg-white px-2 py-0.5 rounded-full text-indigo-400 font-mono">{d.category}</span>
+                <span className="font-bold">{d.name} <span className="text-gray-400 text-xs font-normal">({d.defaultStrength})</span></span>
+              </button>
+              <button onClick={(e) => handleToggleFavorite(e, d)} className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white rounded-full transition-all">
+                <Star className={`w-4 h-4 ${d.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+              </button>
+            </div>
           ))}
         </div>
 
@@ -888,14 +909,45 @@ const PrescriptionForm = ({ patient, db, onSubmit, initialData }: any) => {
 
 const DrugSettings = ({ db }: any) => {
   const [drugs, setDrugs] = useState<any[]>([]);
+  const [search, setSearch] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [newDrug, setNewDrug] = useState({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
 
   const loadDrugs = () => {
-    db.transaction(DRUG_STORE).objectStore(DRUG_STORE).getAll(null, 100).onsuccess = (e: any) => setDrugs(e.target.result);
+    if (!db) return;
+    const tx = db.transaction(DRUG_STORE, 'readonly');
+    const store = tx.objectStore(DRUG_STORE);
+    const searchLower = search.toLowerCase();
+
+    if (searchLower) {
+      const index = store.index('name_lower');
+      const results: any[] = [];
+      const range = IDBKeyRange.bound(searchLower, searchLower + '\uffff');
+      index.openCursor(range).onsuccess = (e: any) => {
+        const cursor = e.target.result;
+        if (cursor && results.length < 50) {
+          results.push(cursor.value);
+          cursor.continue();
+        } else {
+          setDrugs(results);
+        }
+      };
+    } else {
+      store.getAll(null, 50).onsuccess = (e: any) => setDrugs(e.target.result);
+    }
   };
 
-  useEffect(() => { loadDrugs(); }, [db]);
+  useEffect(() => { loadDrugs(); }, [db, search, refreshTrigger]);
+
+  const handleToggleFavorite = async (e: React.MouseEvent, drug: any) => {
+    e.stopPropagation();
+    const updated = { ...drug, isFavorite: !drug.isFavorite };
+    const tx = db.transaction(DRUG_STORE, 'readwrite');
+    tx.objectStore(DRUG_STORE).put(updated).onsuccess = () => {
+      setRefreshTrigger(prev => prev + 1);
+    };
+  };
 
   const handleSaveNewDrug = async () => {
     if (!newDrug.name) return;
@@ -905,13 +957,15 @@ const DrugSettings = ({ db }: any) => {
       name_lower: newDrug.name.toLowerCase(),
       defaultStrength: newDrug.strength,
       defaultInstructions: newDrug.instructions,
-      category: newDrug.category
+      category: newDrug.category,
+      isFavorite: false
     };
     try {
       const tx = db.transaction(DRUG_STORE, 'readwrite');
       tx.objectStore(DRUG_STORE).put(drugData).onsuccess = () => {
         setIsAdding(false);
         setNewDrug({ name: '', strength: '', instructions: 'Once daily', category: 'General' });
+        setSearch('');
         loadDrugs();
       };
     } catch (e) { console.error(e); }
@@ -932,14 +986,19 @@ const DrugSettings = ({ db }: any) => {
 
   return (
     <div className="space-y-4 fade-in">
-      <h2 className="font-bold text-center text-indigo-900 border-b pb-4">بانک داروهای آماده</h2>
+      <h2 className="font-bold text-center text-indigo-900 border-b pb-4">بانک دواها</h2>
+      
       <div className="flex flex-col gap-3">
         {!isAdding ? (
           <button onClick={() => setIsAdding(true)} className="w-full p-5 bg-indigo-50 text-indigo-700 rounded-3xl font-bold flex items-center justify-center gap-2 border border-indigo-100">
             <PlusCircle className="w-5 h-5" /> افزودن دوا جدید
           </button>
         ) : (
-          <div className="bg-white p-6 rounded-3xl shadow-sm border border-indigo-100 space-y-4 fade-in">
+          <div id="add-manual-section" className="bg-white p-6 rounded-3xl shadow-sm border border-indigo-100 space-y-4 fade-in">
+            <div className="flex justify-between items-center mb-1">
+              <button onClick={() => setIsAdding(false)} className="text-gray-400 p-1"><X className="w-5 h-5" /></button>
+              <div className="text-xs font-bold text-indigo-800">ثبت داروی جدید در بانک شخصی</div>
+            </div>
             <input className="w-full p-4 rounded-2xl bg-gray-50 border outline-none" placeholder="نام دوا" value={newDrug.name} onChange={e => setNewDrug({...newDrug, name: e.target.value})} />
             <div className="flex gap-2">
               <input className="flex-1 p-4 rounded-2xl bg-gray-50 border outline-none" placeholder="دوز" value={newDrug.strength} onChange={e => setNewDrug({...newDrug, strength: e.target.value})} />
@@ -963,13 +1022,47 @@ const DrugSettings = ({ db }: any) => {
           </div>
         )}
       </div>
+
+      <div className="relative mt-4">
+        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input className="w-full p-4 pr-10 rounded-2xl bg-white border border-gray-100 outline-none focus:ring-2 focus:ring-indigo-100 shadow-sm text-sm" placeholder="جستجو در بانک دواها..." value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
       <div className="grid gap-2">
         {drugs.map(d => (
-          <div key={d.id} className="bg-white p-4 rounded-2xl shadow-sm text-right border border-gray-50 flex justify-between items-center">
-            <span className="text-[10px] text-indigo-300 font-mono uppercase">{d.category}</span>
-            <div className="flex flex-col items-end"><b className="text-gray-800 font-bold">{d.name}</b><span className="text-xs text-gray-400">{d.defaultStrength}</span></div>
+          <div key={d.id} className="bg-white p-4 rounded-2xl shadow-sm text-right border border-gray-50 flex justify-between items-center group">
+            <div className="flex gap-1.5">
+              <button 
+                onClick={() => {
+                  setNewDrug({
+                    name: d.name,
+                    strength: d.defaultStrength || '',
+                    instructions: d.defaultInstructions || 'Once daily',
+                    category: d.category || 'General'
+                  });
+                  setIsAdding(true);
+                  document.getElementById('add-manual-section')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 flex items-center gap-1.5"
+                title="کپی به بخش افزودن"
+              >
+                <Copy className="w-4 h-4" />
+                <span className="text-[9px] font-bold">استفاده</span>
+              </button>
+              <button onClick={(e) => handleToggleFavorite(e, d)} className="p-2.5 bg-amber-50 rounded-xl hover:bg-amber-100 transition-all">
+                <Star className={`w-4 h-4 ${d.isFavorite ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
+              </button>
+            </div>
+            <div className="flex flex-col items-end">
+              <b className="text-gray-800 font-bold">{d.name}</b>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-gray-400">{d.defaultStrength}</span>
+                <span className="text-[10px] bg-gray-50 px-1.5 py-0.5 rounded text-indigo-300 font-mono uppercase">{d.category}</span>
+              </div>
+            </div>
           </div>
         ))}
+        {drugs.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">دارویی یافت نشد</div>}
       </div>
     </div>
   );
@@ -1070,13 +1163,13 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
               }}>
                 {prescription.medications.map((m: any, idx: number) => (
                   <li key={idx} className="med-item mb-5">
-                    <div className={`font-bold text-[12pt] flex items-baseline ${settings.printLayout.pageSize === 'A4' ? 'w-full justify-between' : 'gap-12'}`}>
-                      <span className={settings.printLayout.pageSize === 'A4' ? 'flex-1' : ''}>
+                    <div className="font-bold text-[12pt] flex items-baseline w-full justify-between">
+                      <span className="flex-1">
                         {m.name} {m.strength}
                       </span>
                       {m.quantity && m.quantity !== '1' && (
-                        <span className={`font-normal text-[11pt] whitespace-nowrap ${settings.printLayout.pageSize === 'A4' ? 'w-[40mm] text-right' : ''}`}>
-                          {settings.printLayout.pageSize === 'A4' ? `N ${m.quantity}` : `N: ${m.quantity}`}
+                        <span className={`font-normal text-[11pt] whitespace-nowrap text-right ${settings.printLayout.pageSize === 'A4' ? 'w-[40mm]' : 'w-[25mm]'}`}>
+                          N {m.quantity}
                         </span>
                       )}
                     </div>
