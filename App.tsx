@@ -135,7 +135,7 @@ const App: React.FC = () => {
             const populateBatch = () => {
               const txBatch = database.transaction(DRUG_STORE, 'readwrite');
               const storeBatch = txBatch.objectStore(DRUG_STORE);
-              const batchLimit = Math.min(i + 15000, TARGET_COUNT); 
+              const batchLimit = Math.min(i + 10000, TARGET_COUNT); 
               
               for (; i < batchLimit; i++) {
                 const form = forms[i % forms.length];
@@ -150,12 +150,12 @@ const App: React.FC = () => {
                   category: categories[i % categories.length],
                   defaultStrength: `${((i % 20) + 1) * 25}mg`,
                   defaultInstructions: 'Once daily',
-                  isFavorite: 0 // Numeric 0 for false
+                  isFavorite: 0 
                 });
               }
               
               if (i < TARGET_COUNT) {
-                setTimeout(populateBatch, 1);
+                setTimeout(populateBatch, 2);
               } else {
                 setIsDbPopulating(false);
               }
@@ -1269,7 +1269,7 @@ const PrescriptionPrintStudio = ({ settings, prescription, patient, onBack }: an
             </div>
             <div className="rx-main">
               <ul className="meds-list" style={{ 
-                marginTop: settings.printLayout.pageSize === 'A5' ? '0' : '14mm', // Adjusted margin to 14mm for A4 to prevent drug list from starting higher than BP
+                marginTop: settings.printLayout.pageSize === 'A4' ? '0' : '10mm', 
                 paddingLeft: settings.printLayout.pageSize === 'A4' ? '15ch' : '0'
               }}>
                 {prescription.medications.map((m: any, idx: number) => (
