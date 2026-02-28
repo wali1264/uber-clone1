@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-do
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import Transactions from './pages/Transactions';
-import { LayoutDashboard, Users, ArrowRightLeft, Globe } from 'lucide-react';
+import CashboxPage from './pages/Cashbox';
+import { LayoutDashboard, Users, ArrowRightLeft, Globe, Wallet } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 
 function NavItem({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
@@ -43,6 +44,7 @@ function Sidebar() {
         <NavItem to="/" icon={LayoutDashboard} label={t('dashboard')} />
         <NavItem to="/customers" icon={Users} label={t('customers')} />
         <NavItem to="/transactions" icon={ArrowRightLeft} label={t('journal')} />
+        <NavItem to="/cashbox" icon={Wallet} label={t('cashbox')} />
       </nav>
       
       <div className="p-4 border-t border-gray-100 space-y-4">
@@ -82,6 +84,7 @@ export default function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/customers" element={<Customers />} />
                 <Route path="/transactions" element={<Transactions />} />
+                <Route path="/cashbox" element={<CashboxPage />} />
               </Routes>
             </div>
           </main>

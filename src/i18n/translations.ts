@@ -39,7 +39,9 @@ export const translations = {
     credit: "بستانکار",
     balance: "مانده",
     actions: "عملیات",
-    view_ledger: "مشاهده صورت‌حساب"
+    view_ledger: "مشاهده صورت‌حساب",
+    type: "نوع",
+    cashbox_history: "تاریخچه صندوق"
   },
   ps: {
     dashboard: "ډشبورډ",
@@ -79,6 +81,8 @@ export const translations = {
     credit: "رسید",
     balance: "بیلانس",
     actions: "کړنې",
-    view_ledger: "صورت‌حساب کتل"
+    view_ledger: "صورت‌حساب کتل",
+    type: "ډول",
+    cashbox_history: "د صندوق تاریخچه"
   }
 };

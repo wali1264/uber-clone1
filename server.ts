@@ -85,6 +85,7 @@ async function startServer() {
       const result = db.prepare('INSERT INTO customers (name, code, phone) VALUES (?, ?, ?)').run(name, code, phone);
       res.json({ id: result.lastInsertRowid, name, code, phone });
     } catch (error: any) {
+      console.error('Error creating customer:', error.message);
       res.status(400).json({ error: error.message });
     }
   });
@@ -98,6 +99,35 @@ async function startServer() {
   app.get('/api/cashbox', (req, res) => {
     const balances = db.prepare('SELECT * FROM cashbox').all();
     res.json(balances);
+  });
+
+  app.get('/api/cashbox/history', (req, res) => {
+    const history = db.prepare(`
+      SELECT 
+        id,
+        'TRANSACTION' as source,
+        created_at,
+        currency_from as currency,
+        amount,
+        description,
+        type as movement_type,
+        customer_id
+      FROM transactions
+      UNION ALL
+      SELECT 
+        id,
+        'ADJUSTMENT' as source,
+        created_at,
+        currency,
+        amount,
+        reason as description,
+        CASE WHEN amount >= 0 THEN 'DEPOSIT' ELSE 'WITHDRAWAL' END as movement_type,
+        NULL as customer_id
+      FROM balance_adjustments
+      ORDER BY created_at DESC
+      LIMIT 100
+    `).all();
+    res.json(history);
   });
 
   // Transactions

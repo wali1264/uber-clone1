@@ -12,12 +12,25 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      const errorText = await res.text();
+      try {
+        const errorJson = JSON.parse(errorText);
+        throw new Error(errorJson.error || errorText);
+      } catch (e) {
+        throw new Error(errorText);
+      }
+    }
     return res.json();
   },
 
   getCashbox: async (): Promise<Cashbox[]> => {
     const res = await fetch('/api/cashbox');
+    return res.json();
+  },
+
+  getCashboxHistory: async (): Promise<any[]> => {
+    const res = await fetch('/api/cashbox/history');
     return res.json();
   },
 

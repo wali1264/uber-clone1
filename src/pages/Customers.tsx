@@ -32,8 +32,8 @@ export default function Customers() {
       setIsCreating(false);
       setNewCustomer({ name: '', code: '', phone: '' });
       loadCustomers();
-    } catch (err) {
-      alert('Failed to create customer');
+    } catch (err: any) {
+      alert(`Failed to create customer: ${err.message}`);
     }
   };
 
