@@ -22,8 +22,8 @@ export default function BankAccounts() {
   }, []);
 
   const loadData = () => {
-    api.getBankAccounts().then(setAccounts);
-    api.getBankAccountHistory().then(setHistory);
+    api.getBankAccounts().then(setAccounts).catch(err => console.error(err));
+    api.getBankAccountHistory().then(res => setHistory(Array.isArray(res) ? res : [])).catch(err => console.error(err));
   };
 
   const handleCreateAccount = async (e: React.FormEvent) => {
@@ -123,8 +123,8 @@ export default function BankAccounts() {
 
       {/* Accounts Cards and History */}
       <div className="space-y-8">
-        {accounts.map((account) => {
-          const accountHistory = history.filter(item => item.bank_name === account.bank_name);
+        {Array.isArray(accounts) && accounts.map((account) => {
+          const accountHistory = Array.isArray(history) ? history.filter(item => item.bank_name === account.bank_name) : [];
           
           return (
             <div key={account.id} className="space-y-4">

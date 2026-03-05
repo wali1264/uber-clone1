@@ -87,6 +87,13 @@ db.exec(`
     rate_version INTEGER,
     details TEXT
   );
+
+  -- Indexes for Performance
+  CREATE INDEX IF NOT EXISTS idx_transactions_customer_id ON transactions(customer_id);
+  CREATE INDEX IF NOT EXISTS idx_transactions_bank_account_id ON transactions(bank_account_id);
+  CREATE INDEX IF NOT EXISTS idx_ledger_customer_id ON ledger(customer_id);
+  CREATE INDEX IF NOT EXISTS idx_ledger_transaction_id ON ledger(transaction_id);
+  CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
 `);
 
 // Seed Cashbox if empty
