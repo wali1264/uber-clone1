@@ -22,70 +22,27 @@ export default function BankAccounts() {
   }, []);
 
   const loadData = () => {
-    api.getBankAccounts().then(serverAccounts => {
-      const localBanksRaw = localStorage.getItem('banks');
-      const localBanks = localBanksRaw ? JSON.parse(localBanksRaw) : [];
-      const formattedLocalBanks = localBanks.map((b: any, i: number) => ({
-        id: 900000 + i,
-        bank_name: b.bankName,
-        account_number: b.accountNumber,
-        currency: 'BANK_TOMAN',
-        balance: b.balance
-      }));
-      
-      const allAccounts = Array.isArray(serverAccounts) ? [...serverAccounts, ...formattedLocalBanks] : formattedLocalBanks;
-      setAccounts(allAccounts);
-    }).catch(err => {
-      console.error(err);
-      const localBanksRaw = localStorage.getItem('banks');
-      const localBanks = localBanksRaw ? JSON.parse(localBanksRaw) : [];
-      const formattedLocalBanks = localBanks.map((b: any, i: number) => ({
-        id: 900000 + i,
-        bank_name: b.bankName,
-        account_number: b.accountNumber,
-        currency: 'BANK_TOMAN',
-        balance: b.balance
-      }));
-      setAccounts(formattedLocalBanks);
-    });
-
+    api.getBankAccounts().then(setAccounts).catch(err => console.error(err));
     api.getBankAccountHistory().then(res => setHistory(Array.isArray(res) ? res : [])).catch(err => console.error(err));
   };
 
-  const saveBankAccount = (bank: any) => {
-    const existing = JSON.parse(localStorage.getItem('banks') || '[]');
-
-    // اگر شماره حساب تکراری بود
-    const alreadyExists = existing.find(
-      (b: any) => b.accountNumber === bank.accountNumber
-    );
-
-    if (alreadyExists) {
-      alert("شماره حساب تکراری است");
-      return;
-    }
-
-    existing.push(bank);
-
-    localStorage.setItem('banks', JSON.stringify(existing));
-
-    alert("حساب با موفقیت ذخیره شد");
-  };
-
-  const handleCreateAccount = (e: React.FormEvent) => {
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const newBank = {
-      bankName: newAccount.bank_name,
-      accountNumber: newAccount.account_number,
-      balance: Number(newAccount.balance)
-    };
+    if (!newAccount.bank_name) return;
 
-    saveBankAccount(newBank);
-    
-    setShowAddModal(false);
-    setNewAccount({ bank_name: '', account_number: '', currency: 'BANK_TOMAN', balance: '' });
-    loadData();
+    try {
+      await api.createBankAccount({
+        bank_name: newAccount.bank_name,
+        account_number: newAccount.account_number,
+        currency: newAccount.currency,
+        balance: Number(newAccount.balance) || 0
+      });
+      setShowAddModal(false);
+      setNewAccount({ bank_name: '', account_number: '', currency: 'BANK_TOMAN', balance: '' });
+      loadData();
+    } catch (err) {
+      alert('Failed to create bank account');
+    }
   };
 
   return (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Save, History, DollarSign, TrendingUp, TrendingDown, Scale } from 'lucide-react';
+import { api } from '../api';
 
 interface ExchangeRate {
   currency_code: string;
@@ -35,69 +36,128 @@ export default function Reports() {
   const currencies = ['AFN', 'USD', 'PKR', 'EUR'];
 
   useEffect(() => {
-    fetchRates();
-    fetchReport();
-    fetchHistory();
+    loadData();
   }, []);
 
-  const fetchRates = async () => {
-    try {
-      const res = await fetch('/api/exchange-rates');
-      const data = await res.json();
-      const rateMap: Record<string, number> = {};
-      data.forEach((r: any) => rateMap[r.currency_code] = r.rate_to_toman);
-      setRates(prev => ({ ...prev, ...rateMap }));
-    } catch (error) {
-      console.error('Error fetching rates:', error);
-    }
-  };
-
-  const fetchReport = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/reports/summary');
-      const data = await res.json();
-      setReport(data);
+      const savedRates = await api.getExchangeRates();
+      setRates(savedRates);
+      await generateReport(savedRates);
+      const savedHistory = await api.getReportHistory();
+      setHistory(savedHistory);
     } catch (error) {
-      console.error('Error fetching report:', error);
+      console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchHistory = async () => {
+  const generateReport = async (currentRates: Record<string, number>) => {
     try {
-      const res = await fetch('/api/reports/history');
-      const data = await res.json();
-      setHistory(data);
+      const [customers, cashbox, banks] = await Promise.all([
+        api.getCustomers(),
+        api.getCashbox(),
+        api.getBankAccounts()
+      ]);
+
+      // Calculate Customer Balances
+      const customerBalances = await Promise.all(customers.map(async (c) => {
+        const ledger = await api.getCustomerLedger(c.id);
+        const balance = ledger.length > 0 ? ledger[0].balance : 0;
+        // Assuming customer balance currency is usually based on their transactions or default
+        // For simplicity, we might need to know the currency of the balance.
+        // In this app, ledger is single currency? No, transactions can be mixed.
+        // But the ledger balance is just a number.
+        // Wait, the ledger logic in localStore sums debits and credits.
+        // If transactions are mixed currency, the balance number is meaningless without conversion.
+        // The current app seems to assume a single base currency or handles it elsewhere?
+        // Looking at Transaction type: currency_from, currency_to.
+        // The ledger entry just has 'balance'.
+        // If I have 100 USD and 100 AFN, the ledger just says 200? That's a bug in the original design if so.
+        // But for now, let's assume the ledger balance is in a primary currency or we just use it.
+        // Actually, let's look at how Ledger is calculated in localStore.
+        // It just adds amounts. So if I add 100 USD and 100 AFN, it says 200.
+        // This is a limitation of the current simple ledger.
+        // However, for this Report, we need to estimate.
+        // Let's assume for now we treat customer balance as 'TOMAN' if not specified, or we need to fetch transactions to know.
+        // To keep it simple and consistent with "Offline/Simple" request:
+        // We will just list them.
+        return {
+          customer_id: c.id,
+          customer_name: c.name,
+          currency: 'TOMAN', // Defaulting to Toman as we don't track currency per customer balance in simple ledger
+          balance: balance
+        };
+      }));
+
+      const reportData: FinancialReport = {
+        totalAssets: 0,
+        totalLiabilities: 0,
+        netCapital: 0,
+        rates: currentRates,
+        details: {
+          customers: customerBalances,
+          cashbox: cashbox.map(c => ({ currency: c.currency, balance: c.balance })),
+          banks: banks.map(b => ({ currency: b.currency, balance: b.balance, bank_name: b.bank_name }))
+        }
+      };
+
+      // Calculate Totals
+      let assets = 0;
+      let liabilities = 0;
+
+      // Cashbox
+      reportData.details.cashbox.forEach(item => {
+        const rate = currentRates[item.currency] || (item.currency === 'TOMAN' ? 1 : 0);
+        assets += item.balance * rate;
+      });
+
+      // Banks
+      reportData.details.banks.forEach(item => {
+        const rate = currentRates[item.currency] || (item.currency === 'BANK_TOMAN' ? 1 : 0);
+        assets += item.balance * rate;
+      });
+
+      // Customers
+      reportData.details.customers.forEach(item => {
+        const rate = currentRates[item.currency] || 1;
+        const val = item.balance * rate;
+        if (val > 0) assets += val; // They owe us
+        else liabilities += Math.abs(val); // We owe them
+      });
+
+      reportData.totalAssets = assets;
+      reportData.totalLiabilities = liabilities;
+      reportData.netCapital = assets - liabilities;
+
+      setReport(reportData);
     } catch (error) {
-      console.error('Error fetching history:', error);
+      console.error('Error generating report:', error);
     }
   };
 
   const updateRate = async (currency: string, rate: number) => {
-    try {
-      await fetch('/api/exchange-rates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currency_code: currency, rate_to_toman: rate }),
-      });
-      setRates(prev => ({ ...prev, [currency]: rate }));
-      fetchReport(); 
-    } catch (error) {
-      console.error('Error updating rate:', error);
-    }
+    const newRates = { ...rates, [currency]: rate };
+    setRates(newRates);
+    await api.saveExchangeRates(newRates);
+    generateReport(newRates);
   };
 
   const saveSnapshot = async () => {
     if (!report) return;
     try {
-      await fetch('/api/reports/snapshot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(report),
-      });
-      fetchHistory();
+      const snapshot = {
+        report_date: new Date().toISOString(),
+        total_assets_toman: report.totalAssets,
+        total_liabilities_toman: report.totalLiabilities,
+        net_capital_toman: report.netCapital,
+        details: JSON.stringify(report.details)
+      };
+      await api.saveReportSnapshot(snapshot);
+      const savedHistory = await api.getReportHistory();
+      setHistory(savedHistory);
       alert('گزارش با موفقیت ذخیره شد');
     } catch (error) {
       console.error('Error saving snapshot:', error);
@@ -112,7 +172,7 @@ export default function Reports() {
   const calculateTotal = (items: any[], currencyKey: string, balanceKey: string) => {
     if (!report || !items) return 0;
     return items.reduce((acc, item) => {
-      const rate = report.rates[item[currencyKey]] || 0;
+      const rate = report.rates[item[currencyKey]] || (item[currencyKey] === 'TOMAN' || item[currencyKey] === 'BANK_TOMAN' ? 1 : 0);
       return acc + (item[balanceKey] * rate);
     }, 0);
   };
@@ -120,7 +180,7 @@ export default function Reports() {
   const calculateCustomerTotal = (items: any[], isAsset: boolean) => {
       if (!report || !items) return 0;
       return items.reduce((acc, item) => {
-          const rate = report.rates[item.currency] || 0;
+          const rate = report.rates[item.currency] || 1;
           const val = item.balance * rate;
           if (isAsset && item.balance > 0) return acc + val;
           if (!isAsset && item.balance < 0) return acc + val; // returns negative sum

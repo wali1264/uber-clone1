@@ -56,26 +56,62 @@ export default function Settings() {
         customers: customers || [],
         transactions: transactions || [],
         cashbox: cashbox || [],
-        ledger: localData.ledger || [], // Fallback to local ledger if needed
+        ledger: localData.ledger || [],
         adjustments: localData.adjustments || [],
         date: new Date().toLocaleString()
       };
 
-      const content = JSON.stringify(data, null, 2);
+      const jsonContent = JSON.stringify(data);
+      const base64Data = btoa(unescape(encodeURIComponent(jsonContent)));
 
-      // Word File (Pseudo-doc)
-      const blobWord = new Blob([content], { type: "application/msword" });
+      // Create HTML content that Word can open as a document
+      const htmlContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset="utf-8">
+          <title>Backup ${data.date}</title>
+          <style>
+            body { font-family: Arial, sans-serif; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            h2 { color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; }
+          </style>
+        </head>
+        <body>
+          <h1>Financial Data Backup</h1>
+          <p>Date: ${data.date}</p>
+          
+          <h2>Banks</h2>
+          <table>
+            <tr><th>Bank Name</th><th>Account Number</th><th>Balance</th></tr>
+            ${data.banks.map((b: any) => `<tr><td>${b.bankName}</td><td>${b.accountNumber}</td><td>${b.balance}</td></tr>`).join('')}
+          </table>
+
+          <h2>Cashbox</h2>
+          <table>
+            <tr><th>Currency</th><th>Balance</th></tr>
+            ${data.cashbox.map((c: any) => `<tr><td>${c.currency}</td><td>${c.balance}</td></tr>`).join('')}
+          </table>
+
+          <h2>Customers</h2>
+          <table>
+            <tr><th>Name</th><th>Phone</th></tr>
+            ${data.customers.map((c: any) => `<tr><td>${c.name}</td><td>${c.phone}</td></tr>`).join('')}
+          </table>
+
+          <!-- EMBEDDED DATA FOR APP RESTORE - DO NOT MODIFY -->
+          <div id="app-backup-data" style="display:none">${base64Data}</div>
+        </body>
+        </html>
+      `;
+
+      // Word File (HTML disguised as DOC)
+      const blobWord = new Blob([htmlContent], { type: "application/msword" });
       const linkWord = document.createElement("a");
       linkWord.href = URL.createObjectURL(blobWord);
       linkWord.download = "backup.doc";
       linkWord.click();
-
-      // PDF File (Pseudo-pdf as requested)
-      const blobPdf = new Blob([content], { type: "application/pdf" });
-      const linkPdf = document.createElement("a");
-      linkPdf.href = URL.createObjectURL(blobPdf);
-      linkPdf.download = "backup.pdf";
-      linkPdf.click();
 
       alert("بکاپ با موفقیت گرفته شد");
     } catch (err) {
@@ -96,14 +132,29 @@ export default function Settings() {
     const reader = new FileReader();
     reader.onload = function (e) {
       try {
-        const data = JSON.parse(e.target?.result as string);
+        const content = e.target?.result as string;
+        let data;
+
+        // Try parsing as pure JSON first (legacy backups)
+        try {
+          data = JSON.parse(content);
+        } catch (jsonError) {
+          // If not JSON, try to extract from HTML/DOC
+          const match = content.match(/<div id="app-backup-data" style="display:none">(.*?)<\/div>/);
+          if (match && match[1]) {
+            const jsonStr = decodeURIComponent(escape(atob(match[1])));
+            data = JSON.parse(jsonStr);
+          } else {
+            throw new Error("Invalid backup file format");
+          }
+        }
 
         // Restore Banks (Client-side)
         if (data.banks) {
           localStorage.setItem('banks', JSON.stringify(data.banks));
         }
 
-        // Restore other data to localStore fallback (since we can't easily overwrite server DB)
+        // Restore other data to localStore fallback
         const currentLocalData = JSON.parse(localStorage.getItem('ledger_app_data') || '{}');
         const newLocalData = {
           ...currentLocalData,
@@ -119,7 +170,7 @@ export default function Settings() {
         window.location.reload();
       } catch (err) {
         console.error(err);
-        alert("خطا در بازیابی فایل بکاپ");
+        alert("خطا در بازیابی فایل بکاپ. لطفا از سالم بودن فایل اطمینان حاصل کنید.");
       }
     };
     reader.readAsText(file);

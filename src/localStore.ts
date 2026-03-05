@@ -10,6 +10,8 @@ interface LocalData {
   transactions: Transaction[];
   ledger: LedgerEntry[];
   adjustments: any[];
+  exchange_rates: any;
+  report_history: any[];
 }
 
 const getInitialData = (): LocalData => ({
@@ -18,7 +20,6 @@ const getInitialData = (): LocalData => ({
     { id: 1, currency: 'AFN', balance: 0 },
     { id: 2, currency: 'USD', balance: 0 },
     { id: 3, currency: 'TOMAN', balance: 0 },
-    { id: 4, currency: 'BANK_TOMAN', balance: 0 },
     { id: 5, currency: 'PKR', balance: 0 }
   ],
   bank_accounts: [
@@ -27,7 +28,9 @@ const getInitialData = (): LocalData => ({
   ],
   transactions: [],
   ledger: [],
-  adjustments: []
+  adjustments: [],
+  exchange_rates: { AFN: 0, USD: 0, PKR: 0 },
+  report_history: []
 });
 
 const getData = (): LocalData => {
@@ -78,7 +81,7 @@ export const localStore = {
   },
 
   getCashbox: async (): Promise<Cashbox[]> => {
-    return getData().cashbox;
+    return getData().cashbox.filter(c => c.currency !== 'BANK_TOMAN');
   },
 
   getBankAccounts: async (): Promise<BankAccount[]> => {
@@ -248,6 +251,35 @@ export const localStore = {
     return { success: true };
   },
 
+  // Reports
+  getExchangeRates: async () => {
+    return getData().exchange_rates || { AFN: 0, USD: 0, PKR: 0 };
+  },
+
+  saveExchangeRates: async (rates: any) => {
+    const data = getData();
+    data.exchange_rates = rates;
+    saveData(data);
+    return { success: true };
+  },
+
+  getReportHistory: async () => {
+    return getData().report_history || [];
+  },
+
+  saveReportSnapshot: async (snapshot: any) => {
+    const data = getData();
+    const newSnapshot = {
+      id: Date.now(),
+      created_at: new Date().toISOString(),
+      ...snapshot
+    };
+    if (!data.report_history) data.report_history = [];
+    data.report_history.push(newSnapshot);
+    saveData(data);
+    return newSnapshot;
+  },
+
   getCustomerLedger: async (id: number): Promise<LedgerEntry[]> => {
     const data = getData();
     return data.ledger
@@ -270,7 +302,7 @@ export const localStore = {
     const data = getData();
     const history = [
       ...data.transactions
-        .filter(tx => !tx.bank_account_id)
+        .filter(tx => !tx.bank_account_id && tx.currency_from !== 'BANK_TOMAN')
         .map(tx => ({
           id: tx.id,
           source: 'TRANSACTION',
@@ -283,18 +315,20 @@ export const localStore = {
           customer_id: tx.customer_id,
           customer_name: data.customers.find(c => c.id === tx.customer_id)?.name
         })),
-      ...data.adjustments.map(adj => ({
-        id: adj.id,
-        source: 'ADJUSTMENT',
-        created_at: adj.created_at,
-        currency: adj.currency,
-        amount: adj.amount,
-        rate: null,
-        description: adj.reason,
-        movement_type: adj.amount >= 0 ? 'DEPOSIT' : 'WITHDRAWAL',
-        customer_id: null,
-        customer_name: null
-      }))
+      ...data.adjustments
+        .filter(adj => adj.currency !== 'BANK_TOMAN')
+        .map(adj => ({
+          id: adj.id,
+          source: 'ADJUSTMENT',
+          created_at: adj.created_at,
+          currency: adj.currency,
+          amount: adj.amount,
+          rate: null,
+          description: adj.reason,
+          movement_type: adj.amount >= 0 ? 'DEPOSIT' : 'WITHDRAWAL',
+          customer_id: null,
+          customer_name: null
+        }))
     ];
 
     return history
