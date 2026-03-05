@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api';
 import { Cashbox } from '../types';
 import { motion } from 'motion/react';
-import { Wallet, DollarSign, ArrowUpRight, ArrowDownLeft, History } from 'lucide-react';
+import { Wallet, DollarSign, History } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 export default function CashboxPage() {
@@ -58,9 +58,10 @@ export default function CashboxPage() {
             <thead className="text-xs text-gray-500 uppercase bg-gray-50">
               <tr>
                 <th className="px-4 py-3">{t('date')}</th>
-                <th className="px-4 py-3">{t('type')}</th>
                 <th className="px-4 py-3">{t('description')}</th>
-                <th className="px-4 py-3 text-right">{t('amount')}</th>
+                <th className="px-4 py-3">{t('fee')}</th>
+                <th className="px-4 py-3 text-right text-red-600">{t('bord')}</th>
+                <th className="px-4 py-3 text-right text-green-600">{t('rasid')}</th>
                 <th className="px-4 py-3">{t('currency')}</th>
               </tr>
             </thead>
@@ -70,20 +71,21 @@ export default function CashboxPage() {
                   <td className="px-4 py-3 text-gray-500 font-mono text-xs">
                     {new Date(item.created_at).toLocaleString()}
                   </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 w-fit ${
-                      item.movement_type === 'DEPOSIT' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
-                      {item.movement_type === 'DEPOSIT' ? <ArrowDownLeft className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                      {item.movement_type === 'DEPOSIT' ? t('deposit') : t('withdrawal')}
-                    </span>
-                  </td>
                   <td className="px-4 py-3 text-gray-900">
+                    {item.customer_name && (
+                      <span className="font-medium text-indigo-600 ml-2">{item.customer_name}: </span>
+                    )}
                     {item.description || '-'}
                     {item.source === 'ADJUSTMENT' && <span className="ml-2 text-xs text-gray-400">({t('manual_adjustment')})</span>}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono font-medium">
-                    {Math.abs(item.amount).toLocaleString()}
+                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                    {item.rate ? item.rate.toLocaleString() : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-medium text-red-600">
+                    {item.movement_type === 'WITHDRAWAL' ? Math.abs(item.amount).toLocaleString() : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-medium text-green-600">
+                    {item.movement_type === 'DEPOSIT' ? Math.abs(item.amount).toLocaleString() : '-'}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {item.currency}

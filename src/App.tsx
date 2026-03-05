@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Customers from './pages/Customers';
 import Transactions from './pages/Transactions';
 import CashboxPage from './pages/Cashbox';
-import { LayoutDashboard, Users, ArrowRightLeft, Globe, Wallet } from 'lucide-react';
+import BankAccounts from './pages/BankAccounts';
+import Reports from './pages/Reports';
+import Login from './pages/Login';
+import Settings from './pages/Settings';
+import { LayoutDashboard, Users, ArrowRightLeft, Globe, Wallet, Building2, Settings as SettingsIcon, Scale } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 
 function NavItem({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
@@ -45,6 +49,9 @@ function Sidebar() {
         <NavItem to="/customers" icon={Users} label={t('customers')} />
         <NavItem to="/transactions" icon={ArrowRightLeft} label={t('journal')} />
         <NavItem to="/cashbox" icon={Wallet} label={t('cashbox')} />
+        <NavItem to="/bank-accounts" icon={Building2} label={t('bank_accounts')} />
+        <NavItem to="/reports" icon={Scale} label={t('reports')} />
+        <NavItem to="/settings" icon={SettingsIcon} label={t('settings')} />
       </nav>
       
       <div className="p-4 border-t border-gray-100 space-y-4">
@@ -71,25 +78,34 @@ function Sidebar() {
 }
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   return (
     <LanguageProvider>
-      <BrowserRouter>
-        <div className="flex h-screen bg-gray-50 font-sans" dir="rtl">
-          <Sidebar />
+      {!isAuthenticated ? (
+        <Login onLogin={() => setIsAuthenticated(true)} />
+      ) : (
+        <BrowserRouter>
+          <div className="flex h-screen bg-gray-50 font-sans" dir="rtl">
+            <Sidebar />
 
-          {/* Main Content */}
-          <main className="flex-1 overflow-auto p-8">
-            <div className="max-w-7xl mx-auto">
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/customers" element={<Customers />} />
-                <Route path="/transactions" element={<Transactions />} />
-                <Route path="/cashbox" element={<CashboxPage />} />
-              </Routes>
-            </div>
-          </main>
-        </div>
-      </BrowserRouter>
+            {/* Main Content */}
+            <main className="flex-1 overflow-auto p-8">
+              <div className="max-w-7xl mx-auto">
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/customers" element={<Customers />} />
+                  <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/cashbox" element={<CashboxPage />} />
+                  <Route path="/bank-accounts" element={<BankAccounts />} />
+                  <Route path="/reports" element={<Reports />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Routes>
+              </div>
+            </main>
+          </div>
+        </BrowserRouter>
+      )}
     </LanguageProvider>
   );
 }

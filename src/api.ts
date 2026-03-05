@@ -1,4 +1,4 @@
-import { Customer, Cashbox, Transaction, LedgerEntry } from './types';
+import { Customer, Cashbox, Transaction, LedgerEntry, BankAccount } from './types';
 import { localStore } from './localStore';
 
 const useFallback = async <T>(apiCall: () => Promise<T>, fallback: () => Promise<T>): Promise<T> => {
@@ -65,6 +65,43 @@ export const api = {
         return res.json();
       },
       localStore.getCashboxHistory
+    );
+  },
+
+  getBankAccounts: async (): Promise<BankAccount[]> => {
+    return useFallback(
+      async () => {
+        const res = await fetch('/api/bank-accounts');
+        if (!res.ok) throw new Error('API Error');
+        return res.json();
+      },
+      localStore.getBankAccounts
+    );
+  },
+
+  createBankAccount: async (data: Partial<BankAccount>): Promise<BankAccount> => {
+    return useFallback(
+      async () => {
+        const res = await fetch('/api/bank-accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      },
+      () => localStore.createBankAccount(data)
+    );
+  },
+
+  getBankAccountHistory: async (): Promise<any[]> => {
+    return useFallback(
+      async () => {
+        const res = await fetch('/api/bank-accounts/history');
+        if (!res.ok) throw new Error('API Error');
+        return res.json();
+      },
+      localStore.getBankAccountHistory
     );
   },
 

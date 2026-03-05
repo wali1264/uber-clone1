@@ -12,6 +12,14 @@ export interface Cashbox {
   balance: number;
 }
 
+export interface BankAccount {
+  id: number;
+  bank_name: string;
+  account_number?: string;
+  currency: string;
+  balance: number;
+}
+
 export interface Transaction {
   id: number;
   customer_id: number;
@@ -23,6 +31,12 @@ export interface Transaction {
   total?: number;
   description?: string;
   created_at: string;
+  bank_account_id?: number;
+  source_card_last4?: string;
+  source_serial_no?: string;
+  destination_card_name?: string;
+  destination_card_last4?: string;
+  exchange_info?: string;
 }
 
 export interface LedgerEntry {
@@ -33,4 +47,9 @@ export interface LedgerEntry {
   credit: number;
   balance: number;
   created_at: string;
+  description?: string;
+  currency_from?: string;
+  rate?: number;
+  exchange_info?: string;
+  type?: 'DEPOSIT' | 'WITHDRAWAL' | 'EXCHANGE';
 }

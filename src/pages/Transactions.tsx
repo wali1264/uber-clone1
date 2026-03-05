@@ -1,21 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
-import { Customer, Cashbox, Transaction } from '../types';
+import { Customer, Cashbox, Transaction, BankAccount } from '../types';
 import { motion } from 'motion/react';
-import { ArrowRightLeft, Download, Upload, Clock } from 'lucide-react';
+import { ArrowRightLeft, Download, Upload, Clock, Wallet, Building2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 export default function Transactions() {
   const { t } = useLanguage();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cashbox, setCashbox] = useState<Cashbox[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<(Transaction & { customer_name: string })[]>([]);
   const [type, setType] = useState<'DEPOSIT' | 'WITHDRAWAL'>('DEPOSIT');
+  const [sourceType, setSourceType] = useState<'CASHBOX' | 'BANK'>('CASHBOX');
   const [formData, setFormData] = useState({
     customer_id: '',
     currency_from: 'USD',
+    bank_account_id: '',
     amount: '',
-    description: ''
+    description: '',
+    source_card_last4: '',
+    source_serial_no: '',
+    destination_card_name: '',
+    destination_card_last4: '',
+    exchange_rates: {} as Record<string, { rate: string, amount: string }>
   });
 
   useEffect(() => {
@@ -25,7 +33,8 @@ export default function Transactions() {
   const loadData = () => {
     api.getCustomers().then(setCustomers);
     api.getCashbox().then(setCashbox);
-    api.getTransactions().then(setTransactions);
+    api.getBankAccounts().then(setBankAccounts);
+    api.getTransactions(10000).then(setTransactions);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,13 +45,28 @@ export default function Transactions() {
       await api.createTransaction({
         customer_id: Number(formData.customer_id),
         type,
-        currency_from: formData.currency_from,
+        currency_from: sourceType === 'CASHBOX' ? formData.currency_from : 'BANK_TOMAN', // Bank accounts are typically Toman
+        bank_account_id: sourceType === 'BANK' ? Number(formData.bank_account_id) : undefined,
         amount: Number(formData.amount),
         description: formData.description,
-        total: Number(formData.amount) // Simple for now
+        total: Number(formData.amount),
+        source_card_last4: sourceType === 'BANK' ? formData.source_card_last4 : undefined,
+        source_serial_no: sourceType === 'BANK' ? formData.source_serial_no : undefined,
+        destination_card_name: sourceType === 'BANK' ? formData.destination_card_name : undefined,
+        destination_card_last4: sourceType === 'BANK' ? formData.destination_card_last4 : undefined,
+        exchange_info: JSON.stringify(formData.exchange_rates)
       });
-      setFormData({ ...formData, amount: '', description: '' });
-      loadData(); // Refresh list
+      setFormData({ 
+        ...formData, 
+        amount: '', 
+        description: '',
+        source_card_last4: '',
+        source_serial_no: '',
+        destination_card_name: '',
+        destination_card_last4: '',
+        exchange_rates: {}
+      });
+      loadData();
     } catch (err) {
       alert('Transaction failed');
     }
@@ -78,6 +102,28 @@ export default function Transactions() {
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            {/* Source/Destination Selector */}
+            <div className="flex gap-2 p-1 bg-gray-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setSourceType('CASHBOX')}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md flex items-center justify-center gap-1 transition-all ${
+                  sourceType === 'CASHBOX' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Wallet className="w-3 h-3" /> {t('cashbox')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceType('BANK')}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md flex items-center justify-center gap-1 transition-all ${
+                  sourceType === 'BANK' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Building2 className="w-3 h-3" /> {t('bank')}
+              </button>
+            </div>
+
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">{t('customers')}</label>
               <select
@@ -95,16 +141,32 @@ export default function Transactions() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">{t('currency')}</label>
-                <select
-                  className="w-full p-2 border rounded-lg bg-gray-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                  value={formData.currency_from}
-                  onChange={e => setFormData({ ...formData, currency_from: e.target.value })}
-                >
-                  {cashbox.map(c => (
-                    <option key={c.currency} value={c.currency}>{c.currency}</option>
-                  ))}
-                </select>
+                <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">
+                  {sourceType === 'CASHBOX' ? t('currency') : t('bank')}
+                </label>
+                {sourceType === 'CASHBOX' ? (
+                  <select
+                    className="w-full p-2 border rounded-lg bg-gray-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    value={formData.currency_from}
+                    onChange={e => setFormData({ ...formData, currency_from: e.target.value })}
+                  >
+                    {cashbox.map(c => (
+                      <option key={c.currency} value={c.currency}>{c.currency}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    className="w-full p-2 border rounded-lg bg-gray-50 focus:bg-white transition-colors outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                    value={formData.bank_account_id}
+                    onChange={e => setFormData({ ...formData, bank_account_id: e.target.value })}
+                    required
+                  >
+                    <option value="">{t('select_source')}</option>
+                    {bankAccounts.map(b => (
+                      <option key={b.id} value={b.id}>{b.bank_name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">{t('amount')}</label>
@@ -119,6 +181,51 @@ export default function Transactions() {
               </div>
             </div>
 
+            {sourceType === 'BANK' && (
+              <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">{t('source_card_last4')}</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 text-sm"
+                    value={formData.source_card_last4}
+                    onChange={e => setFormData({ ...formData, source_card_last4: e.target.value })}
+                    placeholder="1234"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">{t('source_serial_no')}</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 text-sm"
+                    value={formData.source_serial_no}
+                    onChange={e => setFormData({ ...formData, source_serial_no: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">{t('destination_card_name')}</label>
+                  <input
+                    type="text"
+                    className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 text-sm"
+                    value={formData.destination_card_name}
+                    onChange={e => setFormData({ ...formData, destination_card_name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">{t('destination_card_last4')}</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    className="w-full p-2 border rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 text-sm"
+                    value={formData.destination_card_last4}
+                    onChange={e => setFormData({ ...formData, destination_card_last4: e.target.value })}
+                    placeholder="5678"
+                  />
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wider">{t('description')}</label>
               <textarea
@@ -127,6 +234,54 @@ export default function Transactions() {
                 value={formData.description}
                 onChange={e => setFormData({ ...formData, description: e.target.value })}
               />
+            </div>
+
+            {/* Exchange Rates Section */}
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 space-y-3">
+              <h3 className="text-xs font-medium text-gray-700 uppercase tracking-wider mb-2">{t('exchange_rates')}</h3>
+              <div className="grid grid-cols-1 gap-3">
+                {['AFN', 'USD', 'TOMAN', 'PKR', 'BANK_TOMAN'].filter(c => c !== (sourceType === 'CASHBOX' ? formData.currency_from : 'BANK_TOMAN')).map(currency => (
+                  <div key={currency} className="grid grid-cols-3 gap-2 items-center">
+                    <span className="text-sm font-medium text-gray-600">{currency}</span>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder={t('rate_fee')}
+                      className="p-2 border rounded-lg bg-white text-sm"
+                      value={formData.exchange_rates[currency]?.rate || ''}
+                      onChange={e => {
+                        const rate = e.target.value;
+                        const amount = formData.amount && rate ? (Number(formData.amount) * Number(rate)).toFixed(2) : '';
+                        setFormData({
+                          ...formData,
+                          exchange_rates: {
+                            ...formData.exchange_rates,
+                            [currency]: { rate, amount }
+                          }
+                        });
+                      }}
+                    />
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder={t('equivalent')}
+                      className="p-2 border rounded-lg bg-white text-sm"
+                      value={formData.exchange_rates[currency]?.amount || ''}
+                      onChange={e => {
+                        const amount = e.target.value;
+                        const rate = formData.amount && amount ? (Number(amount) / Number(formData.amount)).toFixed(4) : '';
+                        setFormData({
+                          ...formData,
+                          exchange_rates: {
+                            ...formData.exchange_rates,
+                            [currency]: { rate, amount }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             <button
@@ -150,8 +305,10 @@ export default function Transactions() {
                 <tr>
                   <th className="px-4 py-3">{t('date')}</th>
                   <th className="px-4 py-3">{t('customers')}</th>
-                  <th className="px-4 py-3">{t('transaction')}</th>
-                  <th className="px-4 py-3 text-right">{t('amount')}</th>
+                  <th className="px-4 py-3">{t('description')}</th>
+                  <th className="px-4 py-3 text-right text-red-600">{t('bord')}</th>
+                  <th className="px-4 py-3 text-right text-green-600">{t('rasid')}</th>
+                  <th className="px-4 py-3">{t('waston_fee')}</th>
                   <th className="px-4 py-3">{t('currency')}</th>
                 </tr>
               </thead>
@@ -164,15 +321,34 @@ export default function Transactions() {
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {tx.customer_name}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        tx.type === 'DEPOSIT' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                      }`}>
-                        {tx.type === 'DEPOSIT' ? t('deposit') : t('withdrawal')}
-                      </span>
+                    <td className="px-4 py-3 text-gray-500 text-xs truncate max-w-[150px]">
+                      {tx.description || '-'}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono font-medium">
-                      {tx.amount.toLocaleString()}
+                    <td className="px-4 py-3 text-right font-mono font-medium text-red-600">
+                      {tx.type === 'WITHDRAWAL' ? tx.amount.toLocaleString() : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono font-medium text-green-600">
+                      {tx.type === 'DEPOSIT' ? tx.amount.toLocaleString() : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 font-mono text-xs">
+                      {(() => {
+                        if (tx.exchange_info) {
+                          try {
+                            const rates = JSON.parse(tx.exchange_info);
+                            const entries = Object.entries(rates);
+                            if (entries.length > 0) {
+                              return entries.map(([curr, info]: [string, any]) => (
+                                <div key={curr} className="whitespace-nowrap">
+                                  {curr}: {info.rate}
+                                </div>
+                              ));
+                            }
+                          } catch (e) {
+                            console.error('Failed to parse exchange_info', e);
+                          }
+                        }
+                        return tx.rate || '-';
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {tx.currency_from}
@@ -181,7 +357,7 @@ export default function Transactions() {
                 ))}
                 {transactions.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
                       No recent transactions
                     </td>
                   </tr>

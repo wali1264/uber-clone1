@@ -137,8 +137,11 @@ export default function Customers() {
                   <thead className="text-xs text-gray-500 uppercase bg-gray-50 sticky top-0">
                     <tr>
                       <th className="px-6 py-3">{t('date')}</th>
-                      <th className="px-6 py-3">{t('debit')}</th>
-                      <th className="px-6 py-3">{t('credit')}</th>
+                      <th className="px-6 py-3">{t('description')}</th>
+                      <th className="px-6 py-3 text-right text-red-600">{t('bord')}</th>
+                      <th className="px-6 py-3 text-right text-green-600">{t('rasid')}</th>
+                      <th className="px-6 py-3">{t('waston_fee')}</th>
+                      <th className="px-6 py-3">{t('currency')}</th>
                       <th className="px-6 py-3 text-right">{t('balance')}</th>
                     </tr>
                   </thead>
@@ -148,11 +151,37 @@ export default function Customers() {
                         <td className="px-6 py-4 font-mono text-gray-500">
                           {new Date(entry.created_at).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4 text-red-600 font-mono">
+                        <td className="px-6 py-4 text-gray-500 text-xs truncate max-w-[150px]">
+                          {entry.description || '-'}
+                        </td>
+                        <td className="px-6 py-4 text-right font-mono font-medium text-red-600">
                           {entry.debit > 0 ? entry.debit.toLocaleString() : '-'}
                         </td>
-                        <td className="px-6 py-4 text-green-600 font-mono">
+                        <td className="px-6 py-4 text-right font-mono font-medium text-green-600">
                           {entry.credit > 0 ? entry.credit.toLocaleString() : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 font-mono text-xs">
+                          {(() => {
+                            if (entry.exchange_info) {
+                              try {
+                                const rates = JSON.parse(entry.exchange_info);
+                                const entries = Object.entries(rates);
+                                if (entries.length > 0) {
+                                  return entries.map(([curr, info]: [string, any]) => (
+                                    <div key={curr} className="whitespace-nowrap">
+                                      {curr}: {info.rate}
+                                    </div>
+                                  ));
+                                }
+                              } catch (e) {
+                                console.error('Failed to parse exchange_info', e);
+                              }
+                            }
+                            return entry.rate || '-';
+                          })()}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 text-xs">
+                          {entry.currency_from || '-'}
                         </td>
                         <td className="px-6 py-4 text-right font-mono font-medium">
                           {entry.balance.toLocaleString()}
@@ -161,7 +190,7 @@ export default function Customers() {
                     ))}
                     {ledger.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-gray-400">
+                        <td colSpan={7} className="px-6 py-8 text-center text-gray-400">
                           No transactions found
                         </td>
                       </tr>
