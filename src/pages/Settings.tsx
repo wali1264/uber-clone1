@@ -42,13 +42,13 @@ export default function Settings() {
   const exportBackup = async () => {
     try {
       // Fetch all data
-      const [customers, transactions, cashbox] = await Promise.all([
+      const [customers, transactions, cashbox, banks] = await Promise.all([
         api.getCustomers(),
         api.getTransactions(10000), // Get all transactions
-        api.getCashbox()
+        api.getCashbox(),
+        api.getBankAccounts()
       ]);
       
-      const banks = JSON.parse(localStorage.getItem('banks') || '[]');
       const localData = JSON.parse(localStorage.getItem('ledger_app_data') || '{}');
 
       const data = {

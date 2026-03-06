@@ -78,12 +78,19 @@ function Sidebar() {
 }
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isLoggedIn') === 'true';
+  });
+
+  const handleLogin = () => {
+    localStorage.setItem('isLoggedIn', 'true');
+    setIsAuthenticated(true);
+  };
 
   return (
     <LanguageProvider>
       {!isAuthenticated ? (
-        <Login onLogin={() => setIsAuthenticated(true)} />
+        <Login onLogin={handleLogin} />
       ) : (
         <BrowserRouter>
           <div className="flex h-screen bg-gray-50 font-sans" dir="rtl">
