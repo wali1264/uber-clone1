@@ -54,6 +54,20 @@ export default function Reports() {
     }
   };
 
+  const convertToToman = (amount: number, currency: string, currentRates: Record<string, number>) => {
+    if (!amount) return 0;
+    
+    // Normalize currency strings
+    const curr = currency?.toUpperCase();
+    
+    if (curr === 'TOMAN' || curr === 'BANK_TOMAN') {
+      return amount;
+    }
+
+    const rate = currentRates[curr] || 0;
+    return amount * rate;
+  };
+
   const generateReport = async (currentRates: Record<string, number>) => {
     try {
       const [customers, cashbox, banks] = await Promise.all([
@@ -66,28 +80,10 @@ export default function Reports() {
       const customerBalances = await Promise.all(customers.map(async (c) => {
         const ledger = await api.getCustomerLedger(c.id);
         const balance = ledger.length > 0 ? ledger[0].balance : 0;
-        // Assuming customer balance currency is usually based on their transactions or default
-        // For simplicity, we might need to know the currency of the balance.
-        // In this app, ledger is single currency? No, transactions can be mixed.
-        // But the ledger balance is just a number.
-        // Wait, the ledger logic in localStore sums debits and credits.
-        // If transactions are mixed currency, the balance number is meaningless without conversion.
-        // The current app seems to assume a single base currency or handles it elsewhere?
-        // Looking at Transaction type: currency_from, currency_to.
-        // The ledger entry just has 'balance'.
-        // If I have 100 USD and 100 AFN, the ledger just says 200? That's a bug in the original design if so.
-        // But for now, let's assume the ledger balance is in a primary currency or we just use it.
-        // Actually, let's look at how Ledger is calculated in localStore.
-        // It just adds amounts. So if I add 100 USD and 100 AFN, it says 200.
-        // This is a limitation of the current simple ledger.
-        // However, for this Report, we need to estimate.
-        // Let's assume for now we treat customer balance as 'TOMAN' if not specified, or we need to fetch transactions to know.
-        // To keep it simple and consistent with "Offline/Simple" request:
-        // We will just list them.
         return {
           customer_id: c.id,
           customer_name: c.name,
-          currency: 'TOMAN', // Defaulting to Toman as we don't track currency per customer balance in simple ledger
+          currency: 'TOMAN', // Default assumption for ledger balance
           balance: balance
         };
       }));
@@ -104,28 +100,28 @@ export default function Reports() {
         }
       };
 
-      // Calculate Totals
+      // Calculate Totals using convertToToman
       let assets = 0;
       let liabilities = 0;
 
-      // Cashbox
+      // 1. Cashbox Assets
       reportData.details.cashbox.forEach(item => {
-        const rate = currentRates[item.currency] || (item.currency === 'TOMAN' ? 1 : 0);
-        assets += item.balance * rate;
+        assets += convertToToman(item.balance, item.currency, currentRates);
       });
 
-      // Banks
+      // 2. Bank Assets
       reportData.details.banks.forEach(item => {
-        const rate = currentRates[item.currency] || (item.currency === 'BANK_TOMAN' ? 1 : 0);
-        assets += item.balance * rate;
+        assets += convertToToman(item.balance, item.currency, currentRates);
       });
 
-      // Customers
+      // 3. Customer Balances (Receivables = Assets, Payables = Liabilities)
       reportData.details.customers.forEach(item => {
-        const rate = currentRates[item.currency] || 1;
-        const val = item.balance * rate;
-        if (val > 0) assets += val; // They owe us
-        else liabilities += Math.abs(val); // We owe them
+        const val = convertToToman(item.balance, item.currency, currentRates);
+        if (val > 0) {
+          assets += val; // We receive from them
+        } else {
+          liabilities += Math.abs(val); // We pay them
+        }
       });
 
       reportData.totalAssets = assets;
@@ -133,8 +129,10 @@ export default function Reports() {
       reportData.netCapital = assets - liabilities;
 
       setReport(reportData);
+      return reportData;
     } catch (error) {
       console.error('Error generating report:', error);
+      return null;
     }
   };
 
@@ -147,17 +145,25 @@ export default function Reports() {
   };
 
   const saveSnapshot = async () => {
-    if (!report) {
-      alert('گزارش آماده نیست. لطفاً صبر کنید یا صفحه را رفرش کنید.');
+    let currentReport = report;
+    
+    // If report is missing, try to generate it immediately
+    if (!currentReport) {
+      currentReport = await generateReport(rates);
+    }
+
+    if (!currentReport) {
+      alert('خطا در ساخت گزارش. لطفا دوباره تلاش کنید.');
       return;
     }
+
     try {
       const snapshot = {
         report_date: new Date().toISOString(),
-        total_assets_toman: report.totalAssets || 0,
-        total_liabilities_toman: report.totalLiabilities || 0,
-        net_capital_toman: report.netCapital || 0,
-        details: JSON.stringify(report.details)
+        total_assets_toman: currentReport.totalAssets || 0,
+        total_liabilities_toman: currentReport.totalLiabilities || 0,
+        net_capital_toman: currentReport.netCapital || 0,
+        details: JSON.stringify(currentReport.details)
       };
       await api.saveReportSnapshot(snapshot);
       const savedHistory = await api.getReportHistory();
@@ -176,18 +182,16 @@ export default function Reports() {
   const calculateTotal = (items: any[], currencyKey: string, balanceKey: string) => {
     if (!report || !items) return 0;
     return items.reduce((acc, item) => {
-      const rate = report.rates[item[currencyKey]] || (item[currencyKey] === 'TOMAN' || item[currencyKey] === 'BANK_TOMAN' ? 1 : 0);
-      return acc + (item[balanceKey] * rate);
+      return acc + convertToToman(item[balanceKey], item[currencyKey], report.rates);
     }, 0);
   };
   
   const calculateCustomerTotal = (items: any[], isAsset: boolean) => {
       if (!report || !items) return 0;
       return items.reduce((acc, item) => {
-          const rate = report.rates[item.currency] || 1;
-          const val = item.balance * rate;
-          if (isAsset && item.balance > 0) return acc + val;
-          if (!isAsset && item.balance < 0) return acc + val; // returns negative sum
+          const val = convertToToman(item.balance, item.currency, report.rates);
+          if (isAsset && val > 0) return acc + val;
+          if (!isAsset && val < 0) return acc + val;
           return acc;
       }, 0);
   }
