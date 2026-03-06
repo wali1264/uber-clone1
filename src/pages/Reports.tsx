@@ -138,7 +138,8 @@ export default function Reports() {
     }
   };
 
-  const updateRate = async (currency: string, rate: number) => {
+  const updateRate = async (currency: string, value: number) => {
+    const rate = isNaN(value) ? 0 : value;
     const newRates = { ...rates, [currency]: rate };
     setRates(newRates);
     await api.saveExchangeRates(newRates);
@@ -146,13 +147,16 @@ export default function Reports() {
   };
 
   const saveSnapshot = async () => {
-    if (!report) return;
+    if (!report) {
+      alert('گزارش آماده نیست. لطفاً صبر کنید یا صفحه را رفرش کنید.');
+      return;
+    }
     try {
       const snapshot = {
         report_date: new Date().toISOString(),
-        total_assets_toman: report.totalAssets,
-        total_liabilities_toman: report.totalLiabilities,
-        net_capital_toman: report.netCapital,
+        total_assets_toman: report.totalAssets || 0,
+        total_liabilities_toman: report.totalLiabilities || 0,
+        net_capital_toman: report.netCapital || 0,
         details: JSON.stringify(report.details)
       };
       await api.saveReportSnapshot(snapshot);
