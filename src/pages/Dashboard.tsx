@@ -1,119 +1,221 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../api';
-import { Cashbox } from '../types';
-import { motion } from 'motion/react';
-import { Wallet, TrendingUp, DollarSign, Settings, Plus } from 'lucide-react';
-import { useLanguage } from '../contexts/LanguageContext';
+import React, { useEffect, useState } from 'react';
+import { CustomerService, JournalService, Customer, JournalEntry } from '../services/customer';
+import { query } from '../services/db';
+import { Plus, Search, ArrowDownLeft, ArrowUpRight, Trash2 } from 'lucide-react';
+import { format } from 'date-fns-jalali';
 
-export default function Dashboard() {
-  const { t } = useLanguage();
-  const [cashbox, setCashbox] = useState<Cashbox[]>([]);
-  const [isAdjusting, setIsAdjusting] = useState(false);
-  const [adjustment, setAdjustment] = useState({ currency: 'USD', amount: '', reason: '' });
+export function Dashboard() {
+  const [entries, setEntries] = useState<(JournalEntry & { customer_name: string })[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [currencies, setCurrencies] = useState<string[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  
+  // Form State
+  const [formData, setFormData] = useState({
+    customer_id: '',
+    type: 'bard',
+    currency: 'دالر',
+    amount: '',
+    description: '',
+    sentence: ''
+  });
+
+  const fetchData = () => {
+    setEntries(JournalService.getAll());
+    setCustomers(CustomerService.getAll());
+    setCurrencies(query("SELECT name FROM currencies").map((c: any) => c.name));
+  };
 
   useEffect(() => {
-    loadData();
+    fetchData();
   }, []);
 
-  const loadData = () => api.getCashbox().then(setCashbox);
-
-  const handleAdjust = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      await api.createAdjustment({
-        currency: adjustment.currency,
-        amount: Number(adjustment.amount),
-        reason: adjustment.reason
-      });
-      setIsAdjusting(false);
-      setAdjustment({ currency: 'USD', amount: '', reason: '' });
-      loadData();
-    } catch (err) {
-      alert('Adjustment failed');
+    if (!formData.customer_id || !formData.amount) return;
+
+    await JournalService.create({
+      customer_id: Number(formData.customer_id),
+      type: formData.type as 'bard' | 'resid',
+      currency: formData.currency,
+      amount: Number(formData.amount),
+      description: formData.description,
+      date: new Date().toISOString(),
+      sentence: formData.sentence
+    });
+
+    setShowModal(false);
+    setFormData({ ...formData, amount: '', description: '', sentence: '' });
+    fetchData();
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('آیا از حذف این تراکنش اطمینان دارید؟')) {
+      await JournalService.delete(id);
+      fetchData();
     }
   };
 
   return (
     <div className="space-y-6">
-      <header className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{t('dashboard')}</h1>
-          <p className="text-gray-500">{t('daily_balance')}</p>
-        </div>
-        <button
-          onClick={() => setIsAdjusting(!isAdjusting)}
-          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-slate-800">روزنامچه</h2>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
         >
-          <Settings className="w-4 h-4" />
-          {t('adjust_balance')}
+          <Plus className="h-5 w-5" />
+          <span>تراکنش جدید</span>
         </button>
-      </header>
-
-      {isAdjusting && (
-        <motion.form
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"
-          onSubmit={handleAdjust}
-        >
-          <h3 className="text-sm font-bold text-gray-900 mb-4 uppercase tracking-wider">{t('manual_adjustment')}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <select
-              className="border p-2 rounded-lg bg-gray-50"
-              value={adjustment.currency}
-              onChange={e => setAdjustment({ ...adjustment, currency: e.target.value })}
-            >
-              {cashbox.map(c => (
-                <option key={c.currency} value={c.currency}>{c.currency}</option>
-              ))}
-            </select>
-            <input
-              type="number"
-              step="0.01"
-              placeholder={t('amount')}
-              className="border p-2 rounded-lg"
-              value={adjustment.amount}
-              onChange={e => setAdjustment({ ...adjustment, amount: e.target.value })}
-              required
-            />
-            <input
-              placeholder={t('reason')}
-              className="border p-2 rounded-lg"
-              value={adjustment.reason}
-              onChange={e => setAdjustment({ ...adjustment, reason: e.target.value })}
-              required
-            />
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <button type="button" onClick={() => setIsAdjusting(false)} className="px-4 py-2 text-gray-600 text-sm">{t('cancel')}</button>
-            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm">{t('save')}</button>
-          </div>
-        </motion.form>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {cashbox.map((box) => (
-          <motion.div
-            key={box.currency}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-indigo-50 rounded-lg">
-                <DollarSign className="w-6 h-6 text-indigo-600" />
-              </div>
-              <span className="text-xs font-mono text-gray-400">{box.currency}</span>
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-gray-500">{t('current_balance')}</h3>
-              <p className="text-2xl font-bold text-gray-900 font-mono">
-                {box.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </motion.div>
-        ))}
       </div>
+
+      {/* Transactions Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-right">
+            <thead className="bg-slate-50 text-sm font-medium text-slate-500">
+              <tr>
+                <th className="px-6 py-4">تاریخ</th>
+                <th className="px-6 py-4">مشتری</th>
+                <th className="px-6 py-4">نوع</th>
+                <th className="px-6 py-4">مبلغ</th>
+                <th className="px-6 py-4">ارز</th>
+                <th className="px-6 py-4">توضیحات</th>
+                <th className="px-6 py-4">عملیات</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {entries.map((entry) => (
+                <tr key={entry.id} className="hover:bg-slate-50">
+                  <td className="px-6 py-4 text-sm text-slate-600">
+                    {format(new Date(entry.date), 'yyyy/MM/dd HH:mm')}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-slate-900">{entry.customer_name}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      entry.type === 'bard' 
+                        ? 'bg-red-100 text-red-700' 
+                        : 'bg-green-100 text-green-700'
+                    }`}>
+                      {entry.type === 'bard' ? 'برد (بدهکار)' : 'رسید (بستانکار)'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 font-mono font-medium text-slate-900">
+                    {entry.amount.toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{entry.currency}</td>
+                  <td className="px-6 py-4 text-sm text-slate-500">{entry.description}</td>
+                  <td className="px-6 py-4">
+                    <button 
+                      onClick={() => handleDelete(entry.id)}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {entries.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                    هیچ تراکنشی ثبت نشده است
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-6 text-xl font-bold text-slate-800">ثبت تراکنش جدید</h3>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">مشتری</label>
+                  <select 
+                    required
+                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    value={formData.customer_id}
+                    onChange={e => setFormData({...formData, customer_id: e.target.value})}
+                  >
+                    <option value="">انتخاب کنید</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>{c.customer_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">نوع تراکنش</label>
+                  <select 
+                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    value={formData.type}
+                    onChange={e => setFormData({...formData, type: e.target.value})}
+                  >
+                    <option value="bard">برد (بدهکار)</option>
+                    <option value="resid">رسید (بستانکار)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">مبلغ</label>
+                  <input 
+                    type="number" 
+                    required
+                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    value={formData.amount}
+                    onChange={e => setFormData({...formData, amount: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">ارز</label>
+                  <select 
+                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    value={formData.currency}
+                    onChange={e => setFormData({...formData, currency: e.target.value})}
+                  >
+                    {currencies.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">توضیحات</label>
+                <textarea 
+                  className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                  rows={3}
+                  value={formData.description}
+                  onChange={e => setFormData({...formData, description: e.target.value})}
+                />
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100"
+                >
+                  انصراف
+                </button>
+                <button 
+                  type="submit"
+                  className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+                >
+                  ثبت تراکنش
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

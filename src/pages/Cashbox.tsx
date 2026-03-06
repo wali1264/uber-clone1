@@ -1,108 +1,172 @@
-import React, { useState, useEffect } from 'react';
-import { api } from '../api';
-import { Cashbox } from '../types';
-import { motion } from 'motion/react';
-import { Wallet, DollarSign, History } from 'lucide-react';
-import { useLanguage } from '../contexts/LanguageContext';
+import React, { useEffect, useState } from 'react';
+import { CashboxService, CashboxEntry } from '../services/cashbox';
+import { query } from '../services/db';
+import { Plus, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
+import { format } from 'date-fns-jalali';
 
-export default function CashboxPage() {
-  const { t } = useLanguage();
-  const [cashbox, setCashbox] = useState<Cashbox[]>([]);
-  const [history, setHistory] = useState<any[]>([]);
+export function Cashbox() {
+  const [entries, setEntries] = useState<CashboxEntry[]>([]);
+  const [currencies, setCurrencies] = useState<string[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    currency: 'دالر',
+    amount: '',
+    type: 'in',
+    description: ''
+  });
+
+  const fetchData = () => {
+    setEntries(CashboxService.getAll());
+    setCurrencies(query("SELECT name FROM currencies").map((c: any) => c.name));
+  };
 
   useEffect(() => {
-    api.getCashbox().then(setCashbox);
-    api.getCashboxHistory().then(setHistory);
+    fetchData();
   }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await CashboxService.create({
+      currency: formData.currency,
+      amount: Number(formData.amount),
+      type: formData.type as 'in' | 'out',
+      description: formData.description,
+      date: new Date().toISOString()
+    });
+    setShowModal(false);
+    setFormData({ ...formData, amount: '', description: '' });
+    fetchData();
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('آیا از حذف این آیتم اطمینان دارید؟')) {
+      await CashboxService.delete(id);
+      fetchData();
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">{t('cashbox')}</h1>
-        <p className="text-gray-500">{t('current_balance')}</p>
-      </header>
-
-      {/* Balances Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {cashbox.map((box) => (
-          <motion.div
-            key={box.currency}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white p-6 rounded-xl shadow-sm border border-gray-100"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="p-2 bg-indigo-50 rounded-lg">
-                <DollarSign className="w-6 h-6 text-indigo-600" />
-              </div>
-              <span className="text-xs font-mono text-gray-400">{box.currency}</span>
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-gray-500">{t('current_balance')}</h3>
-              <p className="text-2xl font-bold text-gray-900 font-mono">
-                {box.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-          </motion.div>
-        ))}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-slate-800">صندوق</h2>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+        >
+          <Plus className="h-5 w-5" />
+          <span>تراکنش نقدی</span>
+        </button>
       </div>
 
-      {/* History Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
-        <div className="p-4 border-b bg-gray-50 flex items-center gap-2">
-          <History className="w-4 h-4 text-gray-500" />
-          <h2 className="font-medium text-gray-900">{t('recent_activity')}</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="text-xs text-gray-500 uppercase bg-gray-50">
-              <tr>
-                <th className="px-4 py-3">{t('date')}</th>
-                <th className="px-4 py-3">{t('description')}</th>
-                <th className="px-4 py-3">{t('fee')}</th>
-                <th className="px-4 py-3 text-right text-red-600">{t('bord')}</th>
-                <th className="px-4 py-3 text-right text-green-600">{t('rasid')}</th>
-                <th className="px-4 py-3">{t('currency')}</th>
+      {/* Summary Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {currencies.map(curr => {
+          const bal = CashboxService.getBalance(curr);
+          return (
+            <div key={curr} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs text-slate-500">{curr}</p>
+              <p className="text-lg font-bold text-slate-800">{bal.toLocaleString()}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full text-right">
+          <thead className="bg-slate-50 text-sm font-medium text-slate-500">
+            <tr>
+              <th className="px-6 py-4">تاریخ</th>
+              <th className="px-6 py-4">نوع</th>
+              <th className="px-6 py-4">مبلغ</th>
+              <th className="px-6 py-4">ارز</th>
+              <th className="px-6 py-4">توضیحات</th>
+              <th className="px-6 py-4">عملیات</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {entries.map((entry) => (
+              <tr key={entry.id} className="hover:bg-slate-50">
+                <td className="px-6 py-4 text-sm text-slate-600">
+                  {format(new Date(entry.date), 'yyyy/MM/dd HH:mm')}
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    entry.type === 'in' 
+                      ? 'bg-green-100 text-green-700' 
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {entry.type === 'in' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
+                    {entry.type === 'in' ? 'ورود' : 'خروج'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 font-mono font-medium text-slate-900">{entry.amount.toLocaleString()}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{entry.currency}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{entry.description}</td>
+                <td className="px-6 py-4">
+                  <button onClick={() => handleDelete(entry.id)} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {history.map((item, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                    {new Date(item.created_at).toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-gray-900">
-                    {item.customer_name && (
-                      <span className="font-medium text-indigo-600 ml-2">{item.customer_name}: </span>
-                    )}
-                    {item.description || '-'}
-                    {item.source === 'ADJUSTMENT' && <span className="ml-2 text-xs text-gray-400">({t('manual_adjustment')})</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                    {item.rate ? item.rate.toLocaleString() : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-medium text-red-600">
-                    {item.movement_type === 'WITHDRAWAL' ? Math.abs(item.amount).toLocaleString() : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-medium text-green-600">
-                    {item.movement_type === 'DEPOSIT' ? Math.abs(item.amount).toLocaleString() : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    {item.currency}
-                  </td>
-                </tr>
-              ))}
-              {history.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400">
-                    No history found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h3 className="mb-6 text-xl font-bold text-slate-800">تراکنش صندوق</h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">نوع</label>
+                  <select 
+                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    value={formData.type}
+                    onChange={e => setFormData({...formData, type: e.target.value})}
+                  >
+                    <option value="in">ورود پول</option>
+                    <option value="out">خروج پول</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">ارز</label>
+                  <select 
+                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    value={formData.currency}
+                    onChange={e => setFormData({...formData, currency: e.target.value})}
+                  >
+                    {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">مبلغ</label>
+                <input 
+                  type="number" required
+                  className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                  value={formData.amount}
+                  onChange={e => setFormData({...formData, amount: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">توضیحات</label>
+                <textarea 
+                  className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                  value={formData.description}
+                  onChange={e => setFormData({...formData, description: e.target.value})}
+                />
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100">انصراف</button>
+                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">ذخیره</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

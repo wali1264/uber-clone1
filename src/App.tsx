@@ -1,118 +1,81 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import Customers from './pages/Customers';
-import Transactions from './pages/Transactions';
-import CashboxPage from './pages/Cashbox';
-import BankAccounts from './pages/BankAccounts';
-import Reports from './pages/Reports';
-import Login from './pages/Login';
-import Settings from './pages/Settings';
-import { LayoutDashboard, Users, ArrowRightLeft, Globe, Wallet, Building2, Settings as SettingsIcon, Scale } from 'lucide-react';
-import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
-
-function NavItem({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
-  const location = useLocation();
-  const isActive = location.pathname === to;
-  
-  return (
-    <Link
-      to={to}
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-        isActive 
-          ? 'bg-indigo-50 text-indigo-600 font-medium' 
-          : 'text-gray-600 hover:bg-gray-50'
-      }`}
-    >
-      <Icon className="w-5 h-5" />
-      <span>{label}</span>
-    </Link>
-  );
-}
-
-function Sidebar() {
-  const { t, language, setLanguage } = useLanguage();
-
-  return (
-    <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-      <div className="p-6 border-b border-gray-100">
-        <div className="flex items-center gap-2 text-indigo-600 font-bold text-xl tracking-tight">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
-            L
-          </div>
-          Ledger
-        </div>
-      </div>
-      
-      <nav className="flex-1 p-4 space-y-1">
-        <NavItem to="/" icon={LayoutDashboard} label={t('dashboard')} />
-        <NavItem to="/customers" icon={Users} label={t('customers')} />
-        <NavItem to="/transactions" icon={ArrowRightLeft} label={t('journal')} />
-        <NavItem to="/cashbox" icon={Wallet} label={t('cashbox')} />
-        <NavItem to="/bank-accounts" icon={Building2} label={t('bank_accounts')} />
-        <NavItem to="/reports" icon={Scale} label={t('reports')} />
-        <NavItem to="/settings" icon={SettingsIcon} label={t('settings')} />
-      </nav>
-      
-      <div className="p-4 border-t border-gray-100 space-y-4">
-        <div className="flex items-center justify-between px-2">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <Globe className="w-4 h-4" />
-            <span>{t('language')}</span>
-          </div>
-          <select 
-            value={language}
-            onChange={(e) => setLanguage(e.target.value as any)}
-            className="text-sm border rounded p-1 bg-gray-50"
-          >
-            <option value="fa">فارسی</option>
-            <option value="ps">پشتو</option>
-          </select>
-        </div>
-        <div className="text-xs text-gray-400 text-center">
-          v1.0.0 • Multi-Currency
-        </div>
-      </div>
-    </aside>
-  );
-}
+import React, { useEffect, useState } from 'react';
+import { initDB } from './services/db';
+import { AuthService } from './services/auth';
+import { Layout } from './components/Layout';
+import { Login } from './components/Login';
+import { Dashboard } from './pages/Dashboard';
+import { Customers } from './pages/Customers';
+import { Cashbox } from './pages/Cashbox';
+import { Bank } from './pages/Bank';
+import { Reports } from './pages/Reports';
+import { Backup } from './pages/Backup';
+import { Settings } from './pages/Settings';
+import { Loader2 } from 'lucide-react';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('isLoggedIn') === 'true';
-  });
+  const [isInit, setIsInit] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentPage, setCurrentPage] = useState('dashboard');
 
-  const handleLogin = () => {
-    localStorage.setItem('isLoggedIn', 'true');
-    setIsAuthenticated(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    initDB().then(() => {
+      setIsInit(true);
+    }).catch(err => {
+      console.error("DB Init Failed", err);
+      setError("خطا در بارگذاری دیتابیس. لطفا اتصال اینترنت خود را بررسی کنید (برای بار اول نیاز است).");
+    });
+  }, []);
+
+  if (error) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="text-red-600 font-bold text-lg">خطا در راه اندازی</div>
+          <p className="text-slate-600">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+          >
+            تلاش مجدد
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isInit) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+          <p className="text-slate-600 font-medium">در حال راه اندازی سیستم...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login onLogin={() => setIsAuthenticated(true)} />;
+  }
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'dashboard': return <Dashboard />;
+      case 'customers': return <Customers />;
+      case 'cashbox': return <Cashbox />;
+      case 'bank': return <Bank />;
+      case 'reports': return <Reports />;
+      case 'backup': return <Backup />;
+      case 'settings': return <Settings />;
+      default: return <Dashboard />;
+    }
   };
 
   return (
-    <LanguageProvider>
-      {!isAuthenticated ? (
-        <Login onLogin={handleLogin} />
-      ) : (
-        <BrowserRouter>
-          <div className="flex h-screen bg-gray-50 font-sans" dir="rtl">
-            <Sidebar />
-
-            {/* Main Content */}
-            <main className="flex-1 overflow-auto p-8">
-              <div className="max-w-7xl mx-auto">
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/customers" element={<Customers />} />
-                  <Route path="/transactions" element={<Transactions />} />
-                  <Route path="/cashbox" element={<CashboxPage />} />
-                  <Route path="/bank-accounts" element={<BankAccounts />} />
-                  <Route path="/reports" element={<Reports />} />
-                  <Route path="/settings" element={<Settings />} />
-                </Routes>
-              </div>
-            </main>
-          </div>
-        </BrowserRouter>
-      )}
-    </LanguageProvider>
+    <Layout currentPage={currentPage} onNavigate={setCurrentPage}>
+      {renderPage()}
+    </Layout>
   );
 }

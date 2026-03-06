@@ -1,346 +1,117 @@
-import React, { useState, useEffect } from 'react';
-import { Save, History, DollarSign, TrendingUp, TrendingDown, Scale } from 'lucide-react';
-import { api } from '../api';
+import React, { useEffect, useState } from 'react';
+import { ReportService } from '../services/report';
+import { query } from '../services/db';
+import { Calculator } from 'lucide-react';
 
-interface ExchangeRate {
-  currency_code: string;
-  rate_to_toman: number;
-}
-
-interface FinancialReport {
-  totalAssets: number;
-  totalLiabilities: number;
-  netCapital: number;
-  rates: Record<string, number>;
-  details: {
-    customers: { customer_id: number; customer_name: string; currency: string; balance: number }[];
-    cashbox: { currency: string; balance: number }[];
-    banks: { currency: string; balance: number; bank_name: string }[];
-  };
-}
-
-interface ReportHistory {
-  id: number;
-  report_date: string;
-  total_assets_toman: number;
-  total_liabilities_toman: number;
-  net_capital_toman: number;
-}
-
-export default function Reports() {
+export function Reports() {
   const [rates, setRates] = useState<Record<string, number>>({});
-  const [report, setReport] = useState<FinancialReport | null>(null);
-  const [history, setHistory] = useState<ReportHistory[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [currencies, setCurrencies] = useState<string[]>([]);
+  const [report, setReport] = useState<{
+    totalInToman: number;
+    breakdown: any[];
+  } | null>(null);
 
-  const currencies = ['AFN', 'USD', 'PKR', 'EUR'];
+  const fetchData = () => {
+    setRates(ReportService.getRates());
+    setCurrencies(query("SELECT name FROM currencies").map((c: any) => c.name));
+    ReportService.calculateTotalAssets().then(setReport);
+  };
 
   useEffect(() => {
-    loadData();
+    fetchData();
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const savedRates = await api.getExchangeRates();
-      setRates(savedRates);
-      await generateReport(savedRates);
-      const savedHistory = await api.getReportHistory();
-      setHistory(savedHistory);
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleRateChange = async (currency: string, rawValue: string) => {
+    // Remove commas and non-numeric chars
+    const cleanValue = rawValue.replace(/,/g, '');
+    if (isNaN(Number(cleanValue))) return;
+
+    const numRate = cleanValue ? Number(cleanValue) : 0;
+    await ReportService.setRate(currency, numRate);
+    setRates(prev => ({ ...prev, [currency]: numRate }));
+    ReportService.calculateTotalAssets().then(setReport);
   };
-
-  const convertToToman = (amount: number, currency: string, currentRates: Record<string, number>) => {
-    if (!amount) return 0;
-    
-    // Normalize currency strings
-    const curr = currency?.toUpperCase();
-    
-    if (curr === 'TOMAN' || curr === 'BANK_TOMAN') {
-      return amount;
-    }
-
-    const rate = currentRates[curr] || 0;
-    return amount * rate;
-  };
-
-  const generateReport = async (currentRates: Record<string, number>) => {
-    try {
-      const [customers, cashbox, banks] = await Promise.all([
-        api.getCustomers(),
-        api.getCashbox(),
-        api.getBankAccounts()
-      ]);
-
-      // Calculate Customer Balances
-      const customerBalances = await Promise.all(customers.map(async (c) => {
-        const ledger = await api.getCustomerLedger(c.id);
-        const balance = ledger.length > 0 ? ledger[0].balance : 0;
-        return {
-          customer_id: c.id,
-          customer_name: c.name,
-          currency: 'TOMAN', // Default assumption for ledger balance
-          balance: balance
-        };
-      }));
-
-      const reportData: FinancialReport = {
-        totalAssets: 0,
-        totalLiabilities: 0,
-        netCapital: 0,
-        rates: currentRates,
-        details: {
-          customers: customerBalances,
-          cashbox: cashbox.map(c => ({ currency: c.currency, balance: c.balance })),
-          banks: banks.map(b => ({ currency: b.currency, balance: b.balance, bank_name: b.bank_name }))
-        }
-      };
-
-      // Calculate Totals using convertToToman
-      let assets = 0;
-      let liabilities = 0;
-
-      // 1. Cashbox Assets
-      reportData.details.cashbox.forEach(item => {
-        assets += convertToToman(item.balance, item.currency, currentRates);
-      });
-
-      // 2. Bank Assets
-      reportData.details.banks.forEach(item => {
-        assets += convertToToman(item.balance, item.currency, currentRates);
-      });
-
-      // 3. Customer Balances (Receivables = Assets, Payables = Liabilities)
-      reportData.details.customers.forEach(item => {
-        const val = convertToToman(item.balance, item.currency, currentRates);
-        if (val > 0) {
-          assets += val; // We receive from them
-        } else {
-          liabilities += Math.abs(val); // We pay them
-        }
-      });
-
-      reportData.totalAssets = assets;
-      reportData.totalLiabilities = liabilities;
-      reportData.netCapital = assets - liabilities;
-
-      setReport(reportData);
-      return reportData;
-    } catch (error) {
-      console.error('Error generating report:', error);
-      return null;
-    }
-  };
-
-  const updateRate = async (currency: string, value: number) => {
-    const rate = isNaN(value) ? 0 : value;
-    const newRates = { ...rates, [currency]: rate };
-    setRates(newRates);
-    await api.saveExchangeRates(newRates);
-    generateReport(newRates);
-  };
-
-  const saveSnapshot = async () => {
-    let currentReport = report;
-    
-    // If report is missing, try to generate it immediately
-    if (!currentReport) {
-      currentReport = await generateReport(rates);
-    }
-
-    if (!currentReport) {
-      alert('خطا در ساخت گزارش. لطفا دوباره تلاش کنید.');
-      return;
-    }
-
-    try {
-      const snapshot = {
-        report_date: new Date().toISOString(),
-        total_assets_toman: currentReport.totalAssets || 0,
-        total_liabilities_toman: currentReport.totalLiabilities || 0,
-        net_capital_toman: currentReport.netCapital || 0,
-        details: JSON.stringify(currentReport.details)
-      };
-      await api.saveReportSnapshot(snapshot);
-      const savedHistory = await api.getReportHistory();
-      setHistory(savedHistory);
-      alert('گزارش با موفقیت ذخیره شد');
-    } catch (error) {
-      console.error('Error saving snapshot:', error);
-      alert('خطا در ذخیره گزارش');
-    }
-  };
-
-  const formatMoney = (amount: number) => {
-    return new Intl.NumberFormat('fa-IR').format(Math.round(amount));
-  };
-
-  const calculateTotal = (items: any[], currencyKey: string, balanceKey: string) => {
-    if (!report || !items) return 0;
-    return items.reduce((acc, item) => {
-      return acc + convertToToman(item[balanceKey], item[currencyKey], report.rates);
-    }, 0);
-  };
-  
-  const calculateCustomerTotal = (items: any[], isAsset: boolean) => {
-      if (!report || !items) return 0;
-      return items.reduce((acc, item) => {
-          const val = convertToToman(item.balance, item.currency, report.rates);
-          if (isAsset && val > 0) return acc + val;
-          if (!isAsset && val < 0) return acc + val;
-          return acc;
-      }, 0);
-  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <Scale className="w-8 h-8 text-indigo-600" />
-          گزارشات مالی (Financial Reports)
-        </h1>
-        <button
-          onClick={saveSnapshot}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          <Save className="w-4 h-4" />
-          ذخیره گزارش (Snapshot)
-        </button>
-      </div>
+      <h2 className="text-2xl font-bold text-slate-800">گزارشات و دارایی</h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Exchange Rates */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-green-600" />
-            نرخ ارز (Exchange Rates)
-          </h2>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Exchange Rates Input */}
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-2 text-slate-800">
+            <Calculator className="h-5 w-5 text-blue-600" />
+            <h3 className="text-lg font-bold">نرخ ارز (به تومان)</h3>
+          </div>
+          
           <div className="space-y-4">
-            {currencies.map(curr => (
-              <div key={curr} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                <span className="font-medium text-gray-700">{curr}</span>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    value={rates[curr] || ''}
-                    onChange={(e) => updateRate(curr, parseFloat(e.target.value))}
-                    className="w-32 p-2 border rounded text-left ltr focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="Rate"
-                  />
-                  <span className="text-xs text-gray-500 w-12">تومان</span>
-                </div>
+            {currencies.filter(c => !c.includes('تومان')).map(curr => (
+              <div key={curr} className="flex items-center gap-4">
+                <label className="w-24 text-sm font-medium text-slate-600">{curr}</label>
+                <input 
+                  type="text"
+                  inputMode="numeric"
+                  className="flex-1 rounded-lg border border-slate-300 px-4 py-2 font-mono outline-none focus:border-blue-500"
+                  placeholder="0"
+                  value={rates[curr] ? rates[curr].toLocaleString() : ''}
+                  onChange={e => handleRateChange(curr, e.target.value)}
+                />
+                <span className="text-xs text-slate-400">تومان</span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100">
-              <div className="flex items-center gap-2 text-emerald-700 mb-2">
-                <TrendingUp className="w-5 h-5" />
-                <span className="font-medium">مجموع دارایی‌ها</span>
-              </div>
-              <div className="text-2xl font-bold text-emerald-800 ltr text-right">
-                {report ? formatMoney(report.totalAssets) : '...'} <span className="text-sm font-normal">تومان</span>
-              </div>
-            </div>
-
-            <div className="bg-red-50 p-6 rounded-xl border border-red-100">
-              <div className="flex items-center gap-2 text-red-700 mb-2">
-                <TrendingDown className="w-5 h-5" />
-                <span className="font-medium">مجموع بدهی‌ها</span>
-              </div>
-              <div className="text-2xl font-bold text-red-800 ltr text-right">
-                {report ? formatMoney(report.totalLiabilities) : '...'} <span className="text-sm font-normal">تومان</span>
-              </div>
-            </div>
-
-            <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
-              <div className="flex items-center gap-2 text-indigo-700 mb-2">
-                <Scale className="w-5 h-5" />
-                <span className="font-medium">سرمایه خالص</span>
-              </div>
-              <div className="text-2xl font-bold text-indigo-800 ltr text-right">
-                {report ? formatMoney(report.netCapital) : '...'} <span className="text-sm font-normal">تومان</span>
-              </div>
-            </div>
+        {/* Total Assets Display */}
+        <div className="flex flex-col justify-center rounded-2xl bg-slate-900 p-8 text-white shadow-xl">
+          <p className="mb-2 text-slate-400">مجموع کل دارایی‌ها</p>
+          <div className="mb-8 text-4xl font-bold tracking-tight">
+            {report?.totalInToman.toLocaleString()} <span className="text-lg font-normal text-slate-400">تومان</span>
           </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="font-semibold mb-4 text-gray-800 border-b pb-2">جزئیات محاسبات (Details)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-               <div className="space-y-2">
-                 <p className="text-gray-500 font-medium">دارایی‌ها (Assets)</p>
-                 <div className="flex justify-between border-b border-gray-50 pb-1">
-                   <span>موجودی صندوق:</span>
-                   <span className="font-mono">{report ? formatMoney(calculateTotal(report.details.cashbox, 'currency', 'balance')) : 0}</span>
-                 </div>
-                 <div className="flex justify-between border-b border-gray-50 pb-1">
-                   <span>موجودی بانک:</span>
-                   <span className="font-mono">{report ? formatMoney(calculateTotal(report.details.banks, 'currency', 'balance')) : 0}</span>
-                 </div>
-                 <div className="flex justify-between border-b border-gray-50 pb-1">
-                   <span>طلب از مشتریان:</span>
-                   <span className="font-mono">{report ? formatMoney(calculateCustomerTotal(report.details.customers, true)) : 0}</span>
-                 </div>
-               </div>
-               
-               <div className="space-y-2">
-                 <p className="text-gray-500 font-medium">بدهی‌ها (Liabilities)</p>
-                 <div className="flex justify-between border-b border-gray-50 pb-1">
-                   <span>بدهی به مشتریان:</span>
-                   <span className="font-mono text-red-600">{report ? formatMoney(Math.abs(calculateCustomerTotal(report.details.customers, false))) : 0}</span>
-                 </div>
-               </div>
-            </div>
+          
+          <div className="space-y-2 border-t border-white/10 pt-4 text-sm text-slate-400">
+            <p>این مبلغ بر اساس نرخ‌های وارد شده محاسبه شده است.</p>
+            <p>شامل موجودی صندوق و تراز حساب مشتریان.</p>
           </div>
         </div>
       </div>
 
-      {/* History Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <History className="w-5 h-5 text-gray-500" />
-            تاریخچه گزارشات (History)
-          </h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-right">
-            <thead className="bg-gray-50 text-gray-500 text-sm">
-              <tr>
-                <th className="p-4">تاریخ</th>
-                <th className="p-4">دارایی‌ها</th>
-                <th className="p-4">بدهی‌ها</th>
-                <th className="p-4">سرمایه خالص</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {history.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="p-4 font-mono text-gray-600">{new Date(item.report_date).toLocaleString('fa-IR')}</td>
-                  <td className="p-4 text-emerald-600 font-mono">{formatMoney(item.total_assets_toman)}</td>
-                  <td className="p-4 text-red-600 font-mono">{formatMoney(item.total_liabilities_toman)}</td>
-                  <td className="p-4 font-bold text-indigo-600 font-mono">{formatMoney(item.net_capital_toman)}</td>
-                </tr>
-              ))}
-              {history.length === 0 && (
+      {/* Detailed Breakdown Table */}
+      {report && (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="bg-slate-50 px-6 py-4 border-b border-slate-100">
+            <h3 className="font-bold text-slate-800">جزئیات دارایی به تفکیک ارز</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right">
+              <thead className="bg-slate-50 text-xs font-medium text-slate-500 uppercase">
                 <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-400">
-                    هنوز گزارشی ثبت نشده است
-                  </td>
+                  <th className="px-6 py-3">ارز</th>
+                  <th className="px-6 py-3">تراز مشتریان</th>
+                  <th className="px-6 py-3">موجودی صندوق</th>
+                  <th className="px-6 py-3">مجموع</th>
+                  <th className="px-6 py-3">نرخ تبدیل</th>
+                  <th className="px-6 py-3">ارزش به تومان</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {report.breakdown.map((item: any) => (
+                  <tr key={item.currency} className="hover:bg-slate-50">
+                    <td className="px-6 py-4 font-medium text-slate-900">{item.currency}</td>
+                    <td className={`px-6 py-4 font-mono text-sm ${item.customerBalance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {item.customerBalance.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 font-mono text-sm text-slate-600">{item.cashboxBalance.toLocaleString()}</td>
+                    <td className="px-6 py-4 font-mono font-medium text-slate-900">{item.total.toLocaleString()}</td>
+                    <td className="px-6 py-4 font-mono text-sm text-slate-500">{item.rate.toLocaleString()}</td>
+                    <td className="px-6 py-4 font-mono font-bold text-slate-900">{item.valueInToman.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
