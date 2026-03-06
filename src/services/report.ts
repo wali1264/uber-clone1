@@ -70,5 +70,20 @@ export const ReportService = {
     }
 
     return { totalInToman, breakdown };
+  },
+
+  saveReport: async (totalInToman: number, breakdown: any[], description: string = '') => {
+    await run(
+      "INSERT INTO saved_reports (date, total_in_toman, details, description) VALUES (?, ?, ?, ?)",
+      [new Date().toISOString(), totalInToman, JSON.stringify(breakdown), description]
+    );
+  },
+
+  getSavedReports: () => {
+    return query("SELECT * FROM saved_reports ORDER BY date DESC");
+  },
+
+  deleteSavedReport: async (id: number) => {
+    await run("DELETE FROM saved_reports WHERE id = ?", [id]);
   }
 };

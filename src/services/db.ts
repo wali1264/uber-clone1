@@ -32,7 +32,12 @@ export async function initDB() {
       db = new SQL.Database(savedDb);
     } else {
       db = new SQL.Database();
-      initTables(db);
+    }
+    
+    // Always run initTables to ensure new tables are created (migrations)
+    initTables(db);
+    
+    if (!savedDb) {
       await saveDB();
     }
 
@@ -153,6 +158,17 @@ function initTables(database: Database) {
     CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY,
       admin_password TEXT
+    );
+  `);
+
+  // 9. Saved Reports
+  database.run(`
+    CREATE TABLE IF NOT EXISTS saved_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT,
+      total_in_toman REAL,
+      details TEXT, -- JSON string
+      description TEXT
     );
   `);
 }
