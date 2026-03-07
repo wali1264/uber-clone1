@@ -23,11 +23,13 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const menuItems = [
+    { id: 'management', label: 'داشبورد مدیریتی', icon: LayoutDashboard },
     { id: 'dashboard', label: 'روزنامچه', icon: LayoutDashboard },
     { id: 'customers', label: 'دفتر مشتریان', icon: Users },
     { id: 'cashbox', label: 'صندوق', icon: Wallet },
     { id: 'bank', label: 'حسابات بانکی', icon: Landmark },
     { id: 'reports', label: 'گزارشات', icon: PieChart },
+    { id: 'walkin', label: 'روزنامچه راه روی', icon: Users },
     { id: 'backup', label: 'بکاپ و پشتیبان', icon: Save },
     { id: 'settings', label: 'تنظیمات', icon: SettingsIcon },
   ];

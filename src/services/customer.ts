@@ -52,6 +52,17 @@ export const CustomerService = {
     const bard = res[0].total_bard || 0;
     const resid = res[0].total_resid || 0;
     return bard - resid;
+  },
+
+  saveBalanceHistory: async (customerId: number, type: 'weekly' | 'monthly' | 'manual', balances: Record<string, number>, description: string) => {
+    await run(
+      "INSERT INTO customer_balance_history (customer_id, date, type, balances, description) VALUES (?, ?, ?, ?, ?)",
+      [customerId, new Date().toISOString(), type, JSON.stringify(balances), description]
+    );
+  },
+
+  getBalanceHistory: (customerId: number) => {
+    return query("SELECT * FROM customer_balance_history WHERE customer_id = ? ORDER BY date DESC", [customerId]);
   }
 };
 
@@ -89,5 +100,44 @@ export const JournalService = {
 
   delete: async (id: number) => {
     await run("DELETE FROM journal WHERE id = ?", [id]);
+  },
+
+  getDailyReport: (dateStr: string) => {
+    // dateStr is YYYY-MM-DD
+    const startOfDay = new Date(dateStr);
+    startOfDay.setHours(0,0,0,0);
+    
+    const endOfDay = new Date(dateStr);
+    endOfDay.setHours(23,59,59,999);
+    
+    // Get all entries with customer names
+    const all = query(`
+      SELECT j.*, c.customer_name 
+      FROM journal j 
+      LEFT JOIN customers c ON j.customer_id = c.id
+    `) as (JournalEntry & { customer_name: string })[];
+    
+    const openingBalances: Record<string, number> = {};
+    const todayEntries: (JournalEntry & { customer_name: string })[] = [];
+    
+    all.forEach((entry) => {
+      const entryDate = new Date(entry.date);
+      
+      if (entryDate < startOfDay) {
+        // Previous Balance
+        if (!openingBalances[entry.currency]) openingBalances[entry.currency] = 0;
+        // Bard (+), Resid (-)
+        if (entry.type === 'bard') openingBalances[entry.currency] += entry.amount;
+        else openingBalances[entry.currency] -= entry.amount;
+      } else if (entryDate >= startOfDay && entryDate <= endOfDay) {
+        // Today's Entry
+        todayEntries.push(entry);
+      }
+    });
+    
+    // Sort todayEntries DESC
+    todayEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    return { openingBalances, todayEntries };
   }
 };

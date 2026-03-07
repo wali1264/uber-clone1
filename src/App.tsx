@@ -3,6 +3,7 @@ import { initDB } from './services/db';
 import { AuthService } from './services/auth';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
+import { ManagementDashboard } from './pages/ManagementDashboard';
 import { Dashboard } from './pages/Dashboard';
 import { Customers } from './pages/Customers';
 import { Cashbox } from './pages/Cashbox';
@@ -10,6 +11,7 @@ import { Bank } from './pages/Bank';
 import { Reports } from './pages/Reports';
 import { Backup } from './pages/Backup';
 import { Settings } from './pages/Settings';
+import { WalkIn } from './pages/WalkIn';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
@@ -62,11 +64,13 @@ export default function App() {
 
   const renderPage = () => {
     switch (currentPage) {
+      case 'management': return <ManagementDashboard />;
       case 'dashboard': return <Dashboard />;
       case 'customers': return <Customers />;
       case 'cashbox': return <Cashbox />;
       case 'bank': return <Bank />;
       case 'reports': return <Reports />;
+      case 'walkin': return <WalkIn />;
       case 'backup': return <Backup />;
       case 'settings': return <Settings />;
       default: return <Dashboard />;

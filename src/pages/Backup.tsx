@@ -25,6 +25,29 @@ export function Backup() {
           </div>
         </button>
 
+        {/* Database Restore */}
+        <label className="group flex cursor-pointer flex-col items-center justify-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-8 transition-all hover:border-red-500 hover:bg-red-50">
+          <div className="rounded-full bg-red-100 p-4 text-red-600 group-hover:bg-red-200">
+            <Database className="h-8 w-8" />
+          </div>
+          <div className="text-center">
+            <h3 className="font-bold text-slate-800">بازیابی دیتابیس</h3>
+            <p className="text-sm text-slate-500">انتخاب فایل .db</p>
+          </div>
+          <input 
+            type="file" 
+            accept=".db"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files?.[0]) {
+                if (confirm('آیا مطمئن هستید؟ تمام اطلاعات فعلی جایگزین خواهد شد.')) {
+                  BackupService.restoreDB(e.target.files[0]);
+                }
+              }
+            }}
+          />
+        </label>
+
         {/* Word Backup */}
         <button 
           onClick={() => BackupService.generateWord()}

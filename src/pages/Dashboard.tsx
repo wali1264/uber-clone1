@@ -6,9 +6,17 @@ import { format } from 'date-fns-jalali';
 
 export function Dashboard() {
   const [entries, setEntries] = useState<(JournalEntry & { customer_name: string })[]>([]);
+  const [openingBalances, setOpeningBalances] = useState<Record<string, number>>({});
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [currencies, setCurrencies] = useState<string[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
   
   // Form State
   const [formData, setFormData] = useState({
@@ -21,14 +29,16 @@ export function Dashboard() {
   });
 
   const fetchData = () => {
-    setEntries(JournalService.getAll());
+    const { openingBalances, todayEntries } = JournalService.getDailyReport(selectedDate);
+    setEntries(todayEntries);
+    setOpeningBalances(openingBalances);
     setCustomers(CustomerService.getAll());
     setCurrencies(query("SELECT name FROM currencies").map((c: any) => c.name));
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +68,22 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-800">روزنامچه</h2>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold text-slate-800">روزنامچه</h2>
+          <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5">
+            <input 
+              type="date" 
+              className="text-sm outline-none"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+            />
+            <div className="h-4 w-px bg-slate-300 mx-1"></div>
+            <span className="text-sm font-medium text-blue-600 min-w-[80px] text-center">
+              {selectedDate ? format(new Date(selectedDate), 'yyyy/MM/dd') : '-'}
+            </span>
+          </div>
+        </div>
         <button 
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
@@ -85,10 +109,39 @@ export function Dashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {/* Opening Balances Rows */}
+              {Object.entries(openingBalances).map(([curr, amount]) => {
+                if (amount === 0) return null;
+                return (
+                  <tr key={`opening-${curr}`} className="bg-blue-50/50">
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      -
+                    </td>
+                    <td className="px-6 py-4 font-bold text-slate-800">مانده از قبل</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        amount > 0 
+                          ? 'bg-red-100 text-red-700' 
+                          : 'bg-green-100 text-green-700'
+                      }`}>
+                        {amount > 0 ? 'بدهکار' : 'بستانکار'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-mono font-bold text-slate-900">
+                      {Math.abs(amount).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-800">{curr}</td>
+                    <td className="px-6 py-4 text-sm text-slate-500">انتقال از روز قبل</td>
+                    <td className="px-6 py-4"></td>
+                  </tr>
+                );
+              })}
+
+              {/* Daily Entries */}
               {entries.map((entry) => (
                 <tr key={entry.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 text-sm text-slate-600">
-                    {format(new Date(entry.date), 'yyyy/MM/dd HH:mm')}
+                    {format(new Date(entry.date), 'HH:mm')}
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-900">{entry.customer_name}</td>
                   <td className="px-6 py-4">
@@ -115,10 +168,11 @@ export function Dashboard() {
                   </td>
                 </tr>
               ))}
-              {entries.length === 0 && (
+              
+              {entries.length === 0 && Object.keys(openingBalances).length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-500">
-                    هیچ تراکنشی ثبت نشده است
+                    هیچ تراکنشی برای این تاریخ یافت نشد
                   </td>
                 </tr>
               )}

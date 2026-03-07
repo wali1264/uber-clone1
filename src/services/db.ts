@@ -54,6 +54,11 @@ export async function saveDB() {
   await localforage.setItem(DB_NAME, data);
 }
 
+export async function restoreDB(data: Uint8Array) {
+  await localforage.setItem(DB_NAME, data);
+  window.location.reload();
+}
+
 export function getDB() {
   if (!db) throw new Error("Database not initialized");
   return db;
@@ -168,6 +173,18 @@ function initTables(database: Database) {
       date TEXT,
       total_in_toman REAL,
       details TEXT, -- JSON string
+      description TEXT
+    );
+  `);
+
+  // 10. Customer Balance History (Qaid Balance)
+  database.run(`
+    CREATE TABLE IF NOT EXISTS customer_balance_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      customer_id INTEGER,
+      date TEXT,
+      type TEXT, -- 'weekly' | 'monthly' | 'manual'
+      balances TEXT, -- JSON string of balances
       description TEXT
     );
   `);

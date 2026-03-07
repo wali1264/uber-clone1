@@ -1,4 +1,4 @@
-import { getDB } from "./db";
+import { getDB, restoreDB } from "./db";
 import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType } from "docx";
@@ -11,6 +11,60 @@ export const BackupService = {
     const blob = new Blob([data], { type: "application/x-sqlite3" });
     const date = new Date().toISOString().split('T')[0];
     saveAs(blob, `backup_${date}.db`);
+  },
+
+  restoreDB: async (file: File) => {
+    return new Promise<void>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const arrayBuffer = reader.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          await restoreDB(uint8Array);
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  },
+
+  restoreDB: async (file: File) => {
+    return new Promise<void>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const arrayBuffer = reader.result as ArrayBuffer;
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Save to localforage (overwriting existing DB)
+          // We need to import localforage here or use the one from db.ts if exported, 
+          // but db.ts doesn't export the storage key or instance easily.
+          // Let's assume we can use localforage directly as it's a global dependency or import it.
+          // Since we can't easily change imports in this block without context, let's use the one we'll add.
+          
+          // Actually, let's modify db.ts to export a restore function or do it here.
+          // Doing it here requires importing localforage.
+          // Let's assume `import localforage from "localforage";` is added to the top of file by the user or me.
+          // Wait, I can't add imports with `edit_file` easily if I don't replace the top.
+          // I will use `edit_file` to add the import and the method.
+          
+          // But wait, `restoreDB` needs to write to the same key as `db.ts`.
+          // `db.ts` uses `DB_NAME = "saraf_db_v1"`.
+          // I should probably add `restoreDB` to `db.ts` and call it from `BackupService`.
+          // That's cleaner.
+          
+          // Let's skip adding logic here for a moment and modify `db.ts` first.
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
   },
 
   generateWord: async () => {
