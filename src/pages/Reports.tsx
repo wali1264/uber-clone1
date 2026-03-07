@@ -9,6 +9,9 @@ export function Reports() {
   const [currencies, setCurrencies] = useState<string[]>([]);
   const [report, setReport] = useState<{
     totalInToman: number;
+    grossAssets: number;
+    totalReceivablesInToman: number;
+    totalPayablesInToman: number;
     breakdown: any[];
   } | null>(null);
   
@@ -41,7 +44,7 @@ export function Reports() {
 
   const handleSaveReport = async () => {
     if (!report) return;
-    await ReportService.saveReport(report.totalInToman, report.breakdown, description);
+    await ReportService.saveReport(report, description);
     setDescription('');
     fetchData();
     alert('گزارش با موفقیت ذخیره شد');
@@ -103,22 +106,37 @@ export function Reports() {
 
             {/* Total Assets Display */}
             <div className="flex flex-col justify-center rounded-2xl bg-slate-900 p-8 text-white shadow-xl">
-              <p className="mb-2 text-slate-400">مجموع کل دارایی‌ها</p>
-              <div className="mb-8 text-4xl font-bold tracking-tight">
-                {report?.totalInToman.toLocaleString()} <span className="text-lg font-normal text-slate-400">تومان</span>
+              <div className="mb-6">
+                <p className="mb-2 text-slate-400">مجموع کل دارایی</p>
+                <div className="text-4xl font-bold tracking-tight text-emerald-400">
+                  {report?.grossAssets.toLocaleString()} <span className="text-lg font-normal text-slate-400">تومان</span>
+                </div>
+              </div>
+
+              <div className="mb-6 border-t border-white/10 pt-6">
+                <p className="mb-2 text-slate-400">دارایی خالص</p>
+                <div className="text-3xl font-bold tracking-tight">
+                  {report?.totalInToman.toLocaleString()} <span className="text-lg font-normal text-slate-400">تومان</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 border-t border-white/10 pt-4 text-sm">
+                <div>
+                  <p className="text-slate-400">طلب از مشتریان</p>
+                  <p className="font-bold text-blue-400">{report?.totalReceivablesInToman.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-slate-400">بدهی به مشتریان</p>
+                  <p className="font-bold text-red-400">{report?.totalPayablesInToman.toLocaleString()}</p>
+                </div>
               </div>
               
-              <div className="space-y-4 border-t border-white/10 pt-4">
-                <div className="text-sm text-slate-400">
-                  <p>این مبلغ بر اساس نرخ‌های وارد شده محاسبه شده است.</p>
-                  <p>شامل موجودی صندوق و تراز حساب مشتریان.</p>
-                </div>
-
+              <div className="mt-6 space-y-4 border-t border-white/10 pt-4">
                 <div className="flex gap-2">
                   <input 
                     type="text"
                     className="flex-1 rounded-lg bg-slate-800 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="توضیحات (اختیاری) - مثلا: گزارش پایان روز"
+                    placeholder="توضیحات (اختیاری)"
                     value={description}
                     onChange={e => setDescription(e.target.value)}
                   />
@@ -180,6 +198,12 @@ export function Reports() {
           ) : (
             savedReports.map((savedReport) => {
               const details = JSON.parse(savedReport.details);
+              // Handle legacy saved reports that might not have the new fields structure
+              const breakdown = Array.isArray(details) ? details : details.breakdown;
+              const grossAssets = details.grossAssets;
+              const receivables = details.totalReceivablesInToman;
+              const payables = details.totalPayablesInToman;
+
               const isExpanded = expandedReportId === savedReport.id;
               
               return (
@@ -204,7 +228,7 @@ export function Reports() {
                     
                     <div className="flex items-center gap-6">
                       <div className="text-left">
-                        <div className="text-xs text-slate-500">مجموع دارایی</div>
+                        <div className="text-xs text-slate-500">دارایی خالص</div>
                         <div className="font-bold text-slate-900">
                           {savedReport.total_in_toman.toLocaleString()} <span className="text-xs font-normal text-slate-500">تومان</span>
                         </div>
@@ -224,6 +248,24 @@ export function Reports() {
 
                   {isExpanded && (
                     <div className="border-t border-slate-100 p-4">
+                      {/* Summary Cards for Saved Report */}
+                      {grossAssets !== undefined && (
+                        <div className="mb-4 grid grid-cols-3 gap-4 rounded-xl bg-slate-50 p-4 text-center text-sm">
+                          <div>
+                            <div className="text-slate-500">دارایی ناخالص</div>
+                            <div className="font-bold text-green-600">{grossAssets.toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500">طلب از مشتریان</div>
+                            <div className="font-bold text-blue-600">{receivables?.toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500">بدهی به مشتریان</div>
+                            <div className="font-bold text-red-600">{payables?.toLocaleString()}</div>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="overflow-x-auto">
                         <table className="w-full text-right text-sm">
                           <thead className="bg-slate-50 text-xs font-medium text-slate-500 uppercase">
@@ -235,7 +277,7 @@ export function Reports() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {details.map((item: any) => (
+                            {breakdown.map((item: any) => (
                               <tr key={item.currency}>
                                 <td className="px-4 py-2 font-medium text-slate-900">{item.currency}</td>
                                 <td className="px-4 py-2 font-mono text-slate-600">{item.total.toLocaleString()}</td>

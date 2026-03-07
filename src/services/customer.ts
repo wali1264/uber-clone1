@@ -64,9 +64,26 @@ export const JournalService = {
   `) as (JournalEntry & { customer_name: string })[],
 
   create: async (data: Omit<JournalEntry, 'id'>) => {
+    // 1. Create Journal Entry
     await run(
       "INSERT INTO journal (customer_id, type, currency, amount, description, date, sentence) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [data.customer_id, data.type, data.currency, data.amount, data.description, data.date, data.sentence]
+    );
+
+    // 2. Create Corresponding Cashbox Entry
+    // Bard (Withdrawal by customer) -> Money leaves our cashbox (OUT)
+    // Resid (Deposit by customer) -> Money enters our cashbox (IN)
+    const cashboxType = data.type === 'bard' ? 'out' : 'in';
+    
+    // Get customer name for description
+    const customer = query("SELECT customer_name FROM customers WHERE id = ?", [data.customer_id])[0];
+    const customerName = customer ? customer.customer_name : 'مشتری ناشناس';
+    
+    const cashboxDesc = `ثبت خودکار از روزنامچه: ${data.type === 'bard' ? 'برداشت' : 'رسید'} - ${customerName} - ${data.description}`;
+
+    await run(
+      "INSERT INTO cashbox (currency, amount, type, date, description) VALUES (?, ?, ?, ?, ?)",
+      [data.currency, data.amount, cashboxType, data.date, cashboxDesc]
     );
   },
 

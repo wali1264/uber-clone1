@@ -19,26 +19,23 @@ export const ReportService = {
 
   // Calculate total assets in Toman
   // Assets = (Customer Balances + Cashbox Balances) * Rate
-  // Note: This is a simplified view. Real accounting might be more complex.
   calculateTotalAssets: async () => {
     const currencies = query("SELECT name FROM currencies").map((c: any) => c.name);
     const rates = ReportService.getRates();
     
     let totalInToman = 0;
+    let totalReceivablesInToman = 0; // Talab (Positive Balances)
+    let totalPayablesInToman = 0;    // Bedeh (Negative Balances)
+    let totalCashboxInToman = 0;
+
     const breakdown: any[] = [];
 
     for (const currency of currencies) {
-      // 1. Customer Balance (Total Bard - Total Resid)
-      const custRes = query(`
-        SELECT 
-          SUM(CASE WHEN type = 'bard' THEN amount ELSE 0 END) - 
-          SUM(CASE WHEN type = 'resid' THEN amount ELSE 0 END) as balance
-        FROM journal 
-        WHERE currency = ?
-      `, [currency]);
-      const customerBalance = custRes[0].balance || 0;
+      // Get Rate
+      let rate = rates[currency] || 0;
+      if (currency.includes("تومان")) rate = 1;
 
-      // 2. Cashbox Balance (In - Out)
+      // 1. Cashbox Balance (In - Out)
       const cashRes = query(`
         SELECT 
           SUM(CASE WHEN type = 'in' THEN amount ELSE 0 END) - 
@@ -47,21 +44,44 @@ export const ReportService = {
         WHERE currency = ?
       `, [currency]);
       const cashboxBalance = cashRes[0].balance || 0;
+      totalCashboxInToman += cashboxBalance * rate;
 
-      // Total for this currency
-      const total = customerBalance + cashboxBalance;
-      
-      // Convert to Toman
-      // If currency is Toman (Cash or Bank), rate is 1 (or user defined, but usually 1)
-      let rate = rates[currency] || 0;
-      if (currency.includes("تومان")) rate = 1;
+      // 2. Customer Balances (Grouped by customer to separate Debt/Credit)
+      const custRes = query(`
+        SELECT 
+          customer_id,
+          SUM(CASE WHEN type = 'bard' THEN amount ELSE 0 END) - 
+          SUM(CASE WHEN type = 'resid' THEN amount ELSE 0 END) as balance
+        FROM journal 
+        WHERE currency = ?
+        GROUP BY customer_id
+      `, [currency]);
 
+      let currencyReceivables = 0;
+      let currencyPayables = 0;
+      let netCustomerBalance = 0;
+
+      custRes.forEach((c: any) => {
+        const bal = c.balance || 0;
+        netCustomerBalance += bal;
+        if (bal > 0) {
+          currencyReceivables += bal;
+        } else {
+          currencyPayables += Math.abs(bal);
+        }
+      });
+
+      totalReceivablesInToman += currencyReceivables * rate;
+      totalPayablesInToman += currencyPayables * rate;
+
+      // Total Net for this currency (Cashbox + Net Customer)
+      const total = cashboxBalance + netCustomerBalance;
       const valueInToman = total * rate;
       totalInToman += valueInToman;
 
       breakdown.push({
         currency,
-        customerBalance,
+        customerBalance: netCustomerBalance,
         cashboxBalance,
         total,
         rate,
@@ -69,13 +89,21 @@ export const ReportService = {
       });
     }
 
-    return { totalInToman, breakdown };
+    const grossAssets = totalCashboxInToman + totalReceivablesInToman;
+
+    return { 
+      totalInToman, // Net Real Assets
+      grossAssets,  // Cashbox + Receivables
+      totalReceivablesInToman,
+      totalPayablesInToman,
+      breakdown 
+    };
   },
 
-  saveReport: async (totalInToman: number, breakdown: any[], description: string = '') => {
+  saveReport: async (data: any, description: string = '') => {
     await run(
       "INSERT INTO saved_reports (date, total_in_toman, details, description) VALUES (?, ?, ?, ?)",
-      [new Date().toISOString(), totalInToman, JSON.stringify(breakdown), description]
+      [new Date().toISOString(), data.totalInToman, JSON.stringify(data), description]
     );
   },
 
