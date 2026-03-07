@@ -53,32 +53,6 @@ export const BankService = {
         data.source_card_last4, data.tracking_code, data.dest_card, data.dest_card_last4, data.date
       ]
     );
-
-    // Automatic Journal Entry for Customer
-    // Try to find customer by code or name
-    let customer = null;
-    if (data.customer_code) {
-      const res = query("SELECT * FROM customers WHERE customer_code = ?", [data.customer_code]);
-      if (res.length > 0) customer = res[0];
-    }
-    
-    if (!customer && data.customer_name) {
-      const res = query("SELECT * FROM customers WHERE customer_name = ?", [data.customer_name]);
-      if (res.length > 0) customer = res[0];
-    }
-
-    if (customer) {
-      // Bank IN (Deposit) -> Customer Paid Us -> Resid (Receipt)
-      // Bank OUT (Withdrawal) -> We Paid Customer -> Bard (Withdrawal)
-      const journalType = data.type === 'in' ? 'resid' : 'bard';
-      const description = `ثبت خودکار از بانک: ${data.type === 'in' ? 'واریز' : 'برداشت'} - کد پیگیری: ${data.tracking_code || 'ندارد'}`;
-
-      // Insert directly into journal (bypassing JournalService to avoid Cashbox entry)
-      await run(
-        "INSERT INTO journal (customer_id, type, currency, amount, description, date, sentence) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        [customer.id, journalType, 'تومان بانکی', data.amount, description, data.date, 'تراکنش بانکی']
-      );
-    }
   },
 
   deleteTransaction: async (id: number) => {

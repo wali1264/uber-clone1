@@ -89,44 +89,5 @@ export const JournalService = {
 
   delete: async (id: number) => {
     await run("DELETE FROM journal WHERE id = ?", [id]);
-  },
-
-  getDailyReport: (dateStr: string) => {
-    // dateStr is YYYY-MM-DD
-    const startOfDay = new Date(dateStr);
-    startOfDay.setHours(0,0,0,0);
-    
-    const endOfDay = new Date(dateStr);
-    endOfDay.setHours(23,59,59,999);
-    
-    // Get all entries with customer names
-    const all = query(`
-      SELECT j.*, c.customer_name 
-      FROM journal j 
-      LEFT JOIN customers c ON j.customer_id = c.id
-    `) as (JournalEntry & { customer_name: string })[];
-    
-    const openingBalances: Record<string, number> = {};
-    const todayEntries: (JournalEntry & { customer_name: string })[] = [];
-    
-    all.forEach((entry) => {
-      const entryDate = new Date(entry.date);
-      
-      if (entryDate < startOfDay) {
-        // Previous Balance
-        if (!openingBalances[entry.currency]) openingBalances[entry.currency] = 0;
-        // Bard (+), Resid (-)
-        if (entry.type === 'bard') openingBalances[entry.currency] += entry.amount;
-        else openingBalances[entry.currency] -= entry.amount;
-      } else if (entryDate >= startOfDay && entryDate <= endOfDay) {
-        // Today's Entry
-        todayEntries.push(entry);
-      }
-    });
-    
-    // Sort todayEntries DESC
-    todayEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    return { openingBalances, todayEntries };
   }
 };
