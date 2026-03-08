@@ -15,6 +15,7 @@ export function Customers() {
   // History State
   const [historyList, setHistoryList] = useState<any[]>([]);
   const [currentBalances, setCurrentBalances] = useState<Record<string, number>>({});
+  const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
   const [historyType, setHistoryType] = useState<'weekly' | 'monthly' | 'manual'>('manual');
   const [historyDesc, setHistoryDesc] = useState('');
 
@@ -28,7 +29,13 @@ export function Customers() {
     initial_toman_cash: '',
     initial_toman_bank: '',
     initial_dollar: '',
-    initial_kaldar: ''
+    initial_kaldar: '',
+    // Initial Debt
+    initial_debt_afghani: '',
+    initial_debt_toman_cash: '',
+    initial_debt_toman_bank: '',
+    initial_debt_dollar: '',
+    initial_debt_kaldar: ''
   });
 
   const [convertData, setConvertData] = useState({
@@ -61,6 +68,9 @@ export function Customers() {
     
     // Load history
     setHistoryList(CustomerService.getBalanceHistory(customer.id));
+    
+    // Load transactions
+    setCustomerTransactions(CustomerService.getTransactions(customer.id));
     
     setShowHistoryModal(true);
   };
@@ -104,19 +114,43 @@ export function Customers() {
         { curr: 'کلدار', amount: formData.initial_kaldar },
       ];
 
+      const debts = [
+        { curr: 'افغانی', amount: formData.initial_debt_afghani },
+        { curr: 'تومان نقد', amount: formData.initial_debt_toman_cash },
+        { curr: 'تومان بانکی', amount: formData.initial_debt_toman_bank },
+        { curr: 'دالر', amount: formData.initial_debt_dollar },
+        { curr: 'کلدار', amount: formData.initial_debt_kaldar },
+      ];
+
+      const { JournalService } = await import('../services/customer');
+
+      // Process Initial Capital (Resid/Credit)
       for (const cap of capitals) {
         if (cap.amount && Number(cap.amount) > 0) {
-          await import('../services/customer').then(({ JournalService }) => 
-            JournalService.create({
-              customer_id: newCustomer.id,
-              type: 'resid',
-              currency: cap.curr,
-              amount: Number(cap.amount),
-              description: 'سرمایه اولیه',
-              date: date,
-              sentence: 'افتتاح حساب'
-            })
-          );
+          await JournalService.create({
+            customer_id: newCustomer.id,
+            type: 'resid',
+            currency: cap.curr,
+            amount: Number(cap.amount),
+            description: 'سرمایه اولیه (طلب مشتری)',
+            date: date,
+            sentence: 'افتتاح حساب'
+          });
+        }
+      }
+
+      // Process Initial Debt (Bard/Debit)
+      for (const debt of debts) {
+        if (debt.amount && Number(debt.amount) > 0) {
+          await JournalService.create({
+            customer_id: newCustomer.id,
+            type: 'bard',
+            currency: debt.curr,
+            amount: Number(debt.amount),
+            description: 'قرضداری اولیه (بدهی مشتری)',
+            date: date,
+            sentence: 'افتتاح حساب'
+          });
         }
       }
     }
@@ -124,7 +158,8 @@ export function Customers() {
     setShowModal(false);
     setFormData({ 
       customer_code: '', customer_name: '', phone: '', description: '',
-      initial_afghani: '', initial_toman_cash: '', initial_toman_bank: '', initial_dollar: '', initial_kaldar: ''
+      initial_afghani: '', initial_toman_cash: '', initial_toman_bank: '', initial_dollar: '', initial_kaldar: '',
+      initial_debt_afghani: '', initial_debt_toman_cash: '', initial_debt_toman_bank: '', initial_debt_dollar: '', initial_debt_kaldar: ''
     });
     fetchData();
   };
@@ -325,6 +360,37 @@ export function Customers() {
                     <label className="mb-1 block text-xs font-medium text-slate-600">کلدار</label>
                     <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
                       value={formData.initial_kaldar} onChange={e => setFormData({...formData, initial_kaldar: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4">
+                <h4 className="mb-4 font-bold text-red-600">قرضداری اولیه (بدهی مشتری به ما)</h4>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">افغانی</label>
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_afghani} onChange={e => setFormData({...formData, initial_debt_afghani: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">تومان نقد</label>
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_toman_cash} onChange={e => setFormData({...formData, initial_debt_toman_cash: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">تومان بانکی</label>
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_toman_bank} onChange={e => setFormData({...formData, initial_debt_toman_bank: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">دالر</label>
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_dollar} onChange={e => setFormData({...formData, initial_debt_dollar: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">کلدار</label>
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_kaldar} onChange={e => setFormData({...formData, initial_debt_kaldar: e.target.value})} />
                   </div>
                 </div>
               </div>
@@ -535,6 +601,61 @@ export function Customers() {
                       );
                     })
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Transactions List */}
+            <div className="mt-6 border-t border-slate-100 pt-6">
+              <h4 className="mb-4 font-bold text-slate-700 flex items-center gap-2">
+                <History className="h-4 w-4" />
+                ریز تراکنش‌ها
+              </h4>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="max-h-[300px] overflow-y-auto">
+                  <table className="w-full text-right text-sm">
+                    <thead className="bg-slate-50 text-xs font-medium text-slate-500 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2">تاریخ</th>
+                        <th className="px-4 py-2">نوع</th>
+                        <th className="px-4 py-2">مبلغ</th>
+                        <th className="px-4 py-2">ارز</th>
+                        <th className="px-4 py-2">توضیحات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {customerTransactions.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                            {format(new Date(t.date), 'yyyy/MM/dd HH:mm')}
+                          </td>
+                          <td className="px-4 py-2">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                              t.type === 'bard' 
+                                ? 'bg-red-100 text-red-700' 
+                                : 'bg-green-100 text-green-700'
+                            }`}>
+                              {t.type === 'bard' ? 'برد (بدهکار)' : 'رسید (بستانکار)'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 font-mono font-medium text-slate-900">
+                            {t.amount.toLocaleString()}
+                          </td>
+                          <td className="px-4 py-2 text-slate-600">{t.currency}</td>
+                          <td className="px-4 py-2 text-slate-500 truncate max-w-[200px]" title={t.description}>
+                            {t.description}
+                          </td>
+                        </tr>
+                      ))}
+                      {customerTransactions.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-500">
+                            هیچ تراکنشی یافت نشد.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

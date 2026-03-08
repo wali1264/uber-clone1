@@ -63,6 +63,10 @@ export const CustomerService = {
 
   getBalanceHistory: (customerId: number) => {
     return query("SELECT * FROM customer_balance_history WHERE customer_id = ? ORDER BY date DESC", [customerId]);
+  },
+
+  getTransactions: (customerId: number) => {
+    return query("SELECT * FROM journal WHERE customer_id = ? ORDER BY date DESC, id DESC", [customerId]) as JournalEntry[];
   }
 };
 
@@ -74,28 +78,56 @@ export const JournalService = {
     ORDER BY j.date DESC, j.id DESC
   `) as (JournalEntry & { customer_name: string })[],
 
-  create: async (data: Omit<JournalEntry, 'id'>) => {
+  create: async (data: Omit<JournalEntry, 'id'>, bankDetails?: { bank_id: number, tracking_code?: string, source_card_last4?: string }) => {
     // 1. Create Journal Entry
     await run(
       "INSERT INTO journal (customer_id, type, currency, amount, description, date, sentence) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [data.customer_id, data.type, data.currency, data.amount, data.description, data.date, data.sentence]
     );
 
-    // 2. Create Corresponding Cashbox Entry
-    // Bard (Withdrawal by customer) -> Money leaves our cashbox (OUT)
-    // Resid (Deposit by customer) -> Money enters our cashbox (IN)
-    const cashboxType = data.type === 'bard' ? 'out' : 'in';
-    
-    // Get customer name for description
-    const customer = query("SELECT customer_name FROM customers WHERE id = ?", [data.customer_id])[0];
+    // Get customer info
+    const customer = query("SELECT * FROM customers WHERE id = ?", [data.customer_id])[0];
     const customerName = customer ? customer.customer_name : 'مشتری ناشناس';
-    
-    const cashboxDesc = `ثبت خودکار از روزنامچه: ${data.type === 'bard' ? 'برداشت' : 'رسید'} - ${customerName} - ${data.description}`;
+    const customerCode = customer ? customer.customer_code : '';
 
-    await run(
-      "INSERT INTO cashbox (currency, amount, type, date, description) VALUES (?, ?, ?, ?, ?)",
-      [data.currency, data.amount, cashboxType, data.date, cashboxDesc]
-    );
+    if (bankDetails && bankDetails.bank_id) {
+      // 2a. Create Bank Transaction
+      // Bard (Withdrawal by customer) -> Money leaves our Bank (OUT)
+      // Resid (Deposit by customer) -> Money enters our Bank (IN)
+      const bankType = data.type === 'bard' ? 'out' : 'in';
+      
+      await run(
+        `INSERT INTO bank_transactions (
+          bank_id, customer_name, customer_code, type, amount, 
+          source_card_last4, tracking_code, dest_card, dest_card_last4, date
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          bankDetails.bank_id, 
+          customerName, 
+          customerCode, 
+          bankType, 
+          data.amount,
+          bankDetails.source_card_last4 || '', 
+          bankDetails.tracking_code || '', 
+          '', // dest_card
+          '', // dest_card_last4
+          data.date
+        ]
+      );
+
+    } else {
+      // 2b. Create Corresponding Cashbox Entry (Cash Transaction)
+      // Bard (Withdrawal by customer) -> Money leaves our cashbox (OUT)
+      // Resid (Deposit by customer) -> Money enters our cashbox (IN)
+      const cashboxType = data.type === 'bard' ? 'out' : 'in';
+      
+      const cashboxDesc = `ثبت خودکار از روزنامچه: ${data.type === 'bard' ? 'برداشت' : 'رسید'} - ${customerName} - ${data.description}`;
+  
+      await run(
+        "INSERT INTO cashbox (currency, amount, type, date, description) VALUES (?, ?, ?, ?, ?)",
+        [data.currency, data.amount, cashboxType, data.date, cashboxDesc]
+      );
+    }
   },
 
   delete: async (id: number) => {

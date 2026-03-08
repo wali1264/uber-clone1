@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CustomerService, JournalService, Customer, JournalEntry } from '../services/customer';
+import { BankService, BankAccount } from '../services/bank';
 import { query } from '../services/db';
 import { Plus, Search, ArrowDownLeft, ArrowUpRight, Trash2 } from 'lucide-react';
 import { format } from 'date-fns-jalali';
@@ -9,6 +10,7 @@ export function Dashboard() {
   const [openingBalances, setOpeningBalances] = useState<Record<string, number>>({});
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [currencies, setCurrencies] = useState<string[]>([]);
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
@@ -25,7 +27,10 @@ export function Dashboard() {
     currency: 'دالر',
     amount: '',
     description: '',
-    sentence: ''
+    sentence: '',
+    bank_id: '',
+    tracking_code: '',
+    source_card_last4: ''
   });
 
   const fetchData = () => {
@@ -34,6 +39,7 @@ export function Dashboard() {
     setOpeningBalances(openingBalances);
     setCustomers(CustomerService.getAll());
     setCurrencies(query("SELECT name FROM currencies").map((c: any) => c.name));
+    setAccounts(BankService.getAccounts());
   };
 
   useEffect(() => {
@@ -52,10 +58,14 @@ export function Dashboard() {
       description: formData.description,
       date: new Date().toISOString(),
       sentence: formData.sentence
-    });
+    }, formData.bank_id ? {
+      bank_id: Number(formData.bank_id),
+      tracking_code: formData.tracking_code,
+      source_card_last4: formData.source_card_last4
+    } : undefined);
 
     setShowModal(false);
-    setFormData({ ...formData, amount: '', description: '', sentence: '' });
+    setFormData({ ...formData, amount: '', description: '', sentence: '', bank_id: '', tracking_code: '', source_card_last4: '' });
     fetchData();
   };
 
@@ -239,6 +249,45 @@ export function Dashboard() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">حساب بانکی (اختیاری)</label>
+                  <select 
+                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    value={formData.bank_id}
+                    onChange={e => setFormData({...formData, bank_id: e.target.value})}
+                  >
+                    <option value="">بدون حساب بانکی (نقدی)</option>
+                    {accounts.map(acc => (
+                      <option key={acc.id} value={acc.id}>{acc.bank_name} - {acc.owner_name}</option>
+                    ))}
+                  </select>
+                </div>
+                {formData.bank_id && (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">کد پیگیری</label>
+                      <input 
+                        type="text"
+                        className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                        value={formData.tracking_code}
+                        onChange={e => setFormData({...formData, tracking_code: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-slate-700">۴ رقم آخر کارت مبدا</label>
+                      <input 
+                        type="text"
+                        maxLength={4}
+                        className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                        value={formData.source_card_last4}
+                        onChange={e => setFormData({...formData, source_card_last4: e.target.value})}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div>
