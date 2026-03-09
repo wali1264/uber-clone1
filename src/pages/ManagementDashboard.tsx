@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { CustomerService } from '../services/customer';
 import { query } from '../services/db';
 
 export function ManagementDashboard() {
@@ -10,25 +9,36 @@ export function ManagementDashboard() {
     const allCurrencies = query("SELECT name FROM currencies").map((c: any) => c.name);
     setCurrencies(allCurrencies);
 
-    const customers = CustomerService.getAll();
+    // Get all balances in one query
+    const res = query(`
+      SELECT 
+        currency,
+        customer_id,
+        SUM(CASE WHEN type = 'bard' THEN amount ELSE 0 END) - SUM(CASE WHEN type = 'resid' THEN amount ELSE 0 END) as net_balance
+      FROM journal
+      GROUP BY currency, customer_id
+    `);
+
     const newBalances: Record<string, { totalResid: number, totalBard: number, balance: number }> = {};
-
+    
     allCurrencies.forEach(curr => {
-      let totalResid = 0;
-      let totalBard = 0;
-      let balance = 0;
+      newBalances[curr] = { totalResid: 0, totalBard: 0, balance: 0 };
+    });
 
-      customers.forEach(customer => {
-        const custBal = CustomerService.getBalance(customer.id, curr);
-        balance += custBal;
-        if (custBal > 0) {
-          totalBard += custBal; // Positive balance means customer owes us (Bard)
-        } else {
-          totalResid += Math.abs(custBal); // Negative balance means we owe customer (Resid)
-        }
-      });
+    res.forEach((row: any) => {
+      const curr = row.currency;
+      const netBalance = row.net_balance || 0;
+      
+      if (!newBalances[curr]) {
+        newBalances[curr] = { totalResid: 0, totalBard: 0, balance: 0 };
+      }
 
-      newBalances[curr] = { totalResid, totalBard, balance };
+      newBalances[curr].balance += netBalance;
+      if (netBalance > 0) {
+        newBalances[curr].totalBard += netBalance;
+      } else if (netBalance < 0) {
+        newBalances[curr].totalResid += Math.abs(netBalance);
+      }
     });
 
     setBalances(newBalances);

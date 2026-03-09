@@ -38,8 +38,20 @@ export async function initDB() {
     initTables(db);
     
     if (!savedDb) {
-      await saveDB();
+      await forceSaveDB();
     }
+
+    // Ensure data is saved when the window is closed or refreshed
+    window.addEventListener('beforeunload', () => {
+      if (db) {
+        const data = db.export();
+        // Use synchronous localStorage as a fallback or just rely on the fact that 
+        // IndexedDB might not finish in beforeunload. 
+        // Actually, we can't easily do async localforage in beforeunload reliably, 
+        // but we can try to force save.
+        forceSaveDB();
+      }
+    });
 
     return db;
   } catch (err) {
@@ -48,10 +60,37 @@ export async function initDB() {
   }
 }
 
+let saveTimeout: any = null;
+
 export async function saveDB() {
   if (!db) return;
-  const data = db.export();
-  await localforage.setItem(DB_NAME, data);
+  
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+
+  saveTimeout = setTimeout(async () => {
+    try {
+      if (!db) return;
+      const data = db.export();
+      await localforage.setItem(DB_NAME, data);
+    } catch (err) {
+      console.error("Failed to save database to local storage:", err);
+    }
+  }, 1000); // Debounce for 1 second
+}
+
+export async function forceSaveDB() {
+  if (!db) return;
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+  try {
+    const data = db.export();
+    await localforage.setItem(DB_NAME, data);
+  } catch (err) {
+    console.error("Failed to force save database:", err);
+  }
 }
 
 export async function restoreDB(data: Uint8Array) {
@@ -207,5 +246,5 @@ export function query(sql: string, params: any[] = []) {
 export async function run(sql: string, params: any[] = []) {
   const database = getDB();
   database.run(sql, params);
-  await saveDB();
+  saveDB(); // Trigger debounced save
 }

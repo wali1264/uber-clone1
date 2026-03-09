@@ -75,6 +75,7 @@ export const JournalService = {
     SELECT j.*, c.customer_name 
     FROM journal j 
     LEFT JOIN customers c ON j.customer_id = c.id 
+    WHERE j.sentence != 'افتتاح حساب' OR j.sentence IS NULL
     ORDER BY j.date DESC, j.id DESC
   `) as (JournalEntry & { customer_name: string })[],
 
@@ -142,11 +143,12 @@ export const JournalService = {
     const endOfDay = new Date(dateStr);
     endOfDay.setHours(23,59,59,999);
     
-    // Get all entries with customer names
+    // Get all entries with customer names, excluding initial balances
     const all = query(`
       SELECT j.*, c.customer_name 
       FROM journal j 
       LEFT JOIN customers c ON j.customer_id = c.id
+      WHERE j.sentence != 'افتتاح حساب' OR j.sentence IS NULL
     `) as (JournalEntry & { customer_name: string })[];
     
     const openingBalances: Record<string, number> = {};

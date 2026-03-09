@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CustomerService, Customer } from '../services/customer';
-import { query } from '../services/db';
+import { query, run } from '../services/db';
 import { Plus, Search, Trash2, Eye, Calculator, Lock, History } from 'lucide-react';
 import { format } from 'date-fns-jalali';
 
@@ -122,35 +122,23 @@ export function Customers() {
         { curr: 'کلدار', amount: formData.initial_debt_kaldar },
       ];
 
-      const { JournalService } = await import('../services/customer');
-
       // Process Initial Capital (Resid/Credit)
       for (const cap of capitals) {
         if (cap.amount && Number(cap.amount) > 0) {
-          await JournalService.create({
-            customer_id: newCustomer.id,
-            type: 'resid',
-            currency: cap.curr,
-            amount: Number(cap.amount),
-            description: 'سرمایه اولیه (طلب مشتری)',
-            date: date,
-            sentence: 'افتتاح حساب'
-          });
+          await run(
+            "INSERT INTO journal (customer_id, type, currency, amount, description, date, sentence) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [newCustomer.id, 'resid', cap.curr, Number(cap.amount), 'سرمایه اولیه (طلب مشتری)', date, 'افتتاح حساب']
+          );
         }
       }
 
       // Process Initial Debt (Bard/Debit)
       for (const debt of debts) {
         if (debt.amount && Number(debt.amount) > 0) {
-          await JournalService.create({
-            customer_id: newCustomer.id,
-            type: 'bard',
-            currency: debt.curr,
-            amount: Number(debt.amount),
-            description: 'قرضداری اولیه (بدهی مشتری)',
-            date: date,
-            sentence: 'افتتاح حساب'
-          });
+          await run(
+            "INSERT INTO journal (customer_id, type, currency, amount, description, date, sentence) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [newCustomer.id, 'bard', debt.curr, Number(debt.amount), 'قرضداری اولیه (بدهی مشتری)', date, 'افتتاح حساب']
+          );
         }
       }
     }
