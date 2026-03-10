@@ -279,113 +279,113 @@ export function Customers() {
       {/* New Customer Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl my-8">
-            <h3 className="mb-6 text-xl font-bold text-slate-800">تعریف مشتری جدید</h3>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-5 shadow-2xl my-8">
+            <h3 className="mb-4 text-lg font-bold text-slate-800">تعریف مشتری جدید</h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">کد مشتری</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">کد مشتری</label>
                   <input 
                     type="text" required
-                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
                     value={formData.customer_code}
                     onChange={e => setFormData({...formData, customer_code: e.target.value})}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">نام مشتری</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">نام مشتری</label>
                   <input 
                     type="text" required
-                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
                     value={formData.customer_name}
                     onChange={e => setFormData({...formData, customer_name: e.target.value})}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">شماره تماس</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">شماره تماس</label>
                   <input 
                     type="text"
-                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
                     value={formData.phone}
                     onChange={e => setFormData({...formData, phone: e.target.value})}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">توضیحات</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">توضیحات</label>
                   <input 
                     type="text"
-                    className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
+                    className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
                     value={formData.description}
                     onChange={e => setFormData({...formData, description: e.target.value})}
                   />
                 </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-4">
-                <h4 className="mb-4 font-bold text-slate-700">سرمایه اولیه (اختیاری)</h4>
-                <div className="grid gap-4 sm:grid-cols-3">
+              <div className="border-t border-slate-100 pt-3">
+                <h4 className="mb-3 text-sm font-bold text-slate-700">سرمایه اولیه (اختیاری)</h4>
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">افغانی</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
                       value={formData.initial_afghani} onChange={e => setFormData({...formData, initial_afghani: e.target.value})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">تومان نقد</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
                       value={formData.initial_toman_cash} onChange={e => setFormData({...formData, initial_toman_cash: e.target.value})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">تومان بانکی</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
                       value={formData.initial_toman_bank} onChange={e => setFormData({...formData, initial_toman_bank: e.target.value})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">دالر</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
                       value={formData.initial_dollar} onChange={e => setFormData({...formData, initial_dollar: e.target.value})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">کلدار</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-blue-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
                       value={formData.initial_kaldar} onChange={e => setFormData({...formData, initial_kaldar: e.target.value})} />
                   </div>
                 </div>
               </div>
 
-              <div className="border-t border-slate-100 pt-4">
-                <h4 className="mb-4 font-bold text-red-600">قرضداری اولیه (بدهی مشتری به ما)</h4>
-                <div className="grid gap-4 sm:grid-cols-3">
+              <div className="border-t border-slate-100 pt-3">
+                <h4 className="mb-3 text-sm font-bold text-red-600">قرضداری اولیه (بدهی مشتری به ما)</h4>
+                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">افغانی</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
                       value={formData.initial_debt_afghani} onChange={e => setFormData({...formData, initial_debt_afghani: e.target.value})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">تومان نقد</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
                       value={formData.initial_debt_toman_cash} onChange={e => setFormData({...formData, initial_debt_toman_cash: e.target.value})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">تومان بانکی</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
                       value={formData.initial_debt_toman_bank} onChange={e => setFormData({...formData, initial_debt_toman_bank: e.target.value})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">دالر</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
                       value={formData.initial_debt_dollar} onChange={e => setFormData({...formData, initial_debt_dollar: e.target.value})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">کلدار</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-2 text-sm outline-none focus:border-red-500"
+                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
                       value={formData.initial_debt_kaldar} onChange={e => setFormData({...formData, initial_debt_kaldar: e.target.value})} />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100">انصراف</button>
-                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">ذخیره</button>
+              <div className="mt-4 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">انصراف</button>
+                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">ذخیره</button>
               </div>
             </form>
           </div>
