@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CustomerService, Customer } from '../services/customer';
 import { query, run } from '../services/db';
-import { Plus, Search, Trash2, Eye, Calculator, Lock, History } from 'lucide-react';
+import { Plus, Search, Trash2, Eye, Calculator, Lock, History, Share2, Download, Image as ImageIcon, X, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns-jalali';
 
 export function Customers() {
@@ -9,6 +9,7 @@ export function Customers() {
   const [showModal, setShowModal] = useState(false);
   const [showConvertModal, setShowConvertModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [currencies, setCurrencies] = useState<string[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   
@@ -18,6 +19,95 @@ export function Customers() {
   const [customerTransactions, setCustomerTransactions] = useState<any[]>([]);
   const [historyType, setHistoryType] = useState<'weekly' | 'monthly' | 'manual'>('manual');
   const [historyDesc, setHistoryDesc] = useState('');
+  const [isHistoryConfirmed, setIsHistoryConfirmed] = useState(false);
+
+  const handleOpenShare = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    
+    // Calculate current balances
+    const balances: Record<string, number> = {};
+    currencies.forEach(curr => {
+      const bal = CustomerService.getBalance(customer.id, curr);
+      if (bal !== 0) balances[curr] = bal;
+    });
+    setCurrentBalances(balances);
+    
+    // Load transactions
+    setCustomerTransactions(CustomerService.getTransactions(customer.id));
+    
+    setShowShareModal(true);
+  };
+
+  const handleDownloadImage = async () => {
+    const element = document.getElementById('statement-capture');
+    if (!element) return;
+    
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(element, { scale: 2 });
+    const dataUrl = canvas.toDataURL('image/png');
+    
+    const link = document.createElement('a');
+    link.download = `صورت_حساب_${selectedCustomer?.customer_name}.png`;
+    link.href = dataUrl;
+    link.click();
+  };
+
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('statement-capture');
+    if (!element) return;
+    
+    const html2canvas = (await import('html2canvas')).default;
+    const { jsPDF } = await import('jspdf');
+    
+    const canvas = await html2canvas(element, { scale: 2 });
+    const imgData = canvas.toDataURL('image/png');
+    
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+    
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.save(`صورت_حساب_${selectedCustomer?.customer_name}.pdf`);
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!selectedCustomer) return;
+    
+    let text = `*صورت حساب مشتری*\n`;
+    text += `نام: ${selectedCustomer.customer_name}\n`;
+    if (selectedCustomer.customer_code) {
+      text += `کد: ${selectedCustomer.customer_code}\n`;
+    }
+    text += `تاریخ: ${format(new Date(), 'yyyy/MM/dd')}\n\n`;
+    
+    text += `*وضعیت حساب فعلی:*\n`;
+    if (Object.entries(currentBalances).length > 0) {
+      Object.entries(currentBalances).forEach(([curr, amount]) => {
+        text += `- ${curr}: ${Math.abs(amount).toLocaleString()} ${amount > 0 ? 'بدهکار' : 'بستانکار'}\n`;
+      });
+    } else {
+      text += `حساب صفر است.\n`;
+    }
+    
+    text += `\n*ریز تراکنش‌های اخیر:*\n`;
+    if (customerTransactions.length > 0) {
+      customerTransactions.slice(0, 10).forEach(t => {
+        text += `${format(new Date(t.date), 'yyyy/MM/dd')} | ${t.type === 'bard' ? 'برد' : 'رسید'} | ${t.amount.toLocaleString()} ${t.currency}\n`;
+        if (t.description) text += `📝 ${t.description}\n`;
+        text += `-------------------\n`;
+      });
+    } else {
+      text += `تراکنشی یافت نشد.\n`;
+    }
+    
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   const [formData, setFormData] = useState({
     customer_code: '',
@@ -46,6 +136,18 @@ export function Customers() {
     operation: 'multiply'
   });
 
+  const formatCurrencyInput = (value: string) => {
+    if (!value) return '';
+    let clean = value.replace(/[^\d.]/g, '');
+    const parts = clean.split('.');
+    if (parts.length > 2) {
+      clean = parts[0] + '.' + parts.slice(1).join('');
+    }
+    const finalParts = clean.split('.');
+    finalParts[0] = finalParts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return finalParts.join('.');
+  };
+
   const fetchData = () => {
     setCustomers(CustomerService.getAll());
     setCurrencies(query("SELECT name FROM currencies").map((c: any) => c.name));
@@ -72,6 +174,7 @@ export function Customers() {
     // Load transactions
     setCustomerTransactions(CustomerService.getTransactions(customer.id));
     
+    setIsHistoryConfirmed(false);
     setShowHistoryModal(true);
   };
 
@@ -124,20 +227,22 @@ export function Customers() {
 
       // Process Initial Capital (Resid/Credit)
       for (const cap of capitals) {
-        if (cap.amount && Number(cap.amount) > 0) {
+        const val = cap.amount ? Number(cap.amount.replace(/,/g, '')) : 0;
+        if (val > 0) {
           await run(
             "INSERT INTO journal (customer_id, type, currency, amount, description, date, sentence) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [newCustomer.id, 'resid', cap.curr, Number(cap.amount), 'سرمایه اولیه (طلب مشتری)', date, 'افتتاح حساب']
+            [newCustomer.id, 'resid', cap.curr, val, 'سرمایه اولیه (طلب مشتری)', date, 'افتتاح حساب']
           );
         }
       }
 
       // Process Initial Debt (Bard/Debit)
       for (const debt of debts) {
-        if (debt.amount && Number(debt.amount) > 0) {
+        const val = debt.amount ? Number(debt.amount.replace(/,/g, '')) : 0;
+        if (val > 0) {
           await run(
             "INSERT INTO journal (customer_id, type, currency, amount, description, date, sentence) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [newCustomer.id, 'bard', debt.curr, Number(debt.amount), 'قرضداری اولیه (بدهی مشتری)', date, 'افتتاح حساب']
+            [newCustomer.id, 'bard', debt.curr, val, 'قرضداری اولیه (بدهی مشتری)', date, 'افتتاح حساب']
           );
         }
       }
@@ -156,8 +261,8 @@ export function Customers() {
     e.preventDefault();
     if (!selectedCustomer || !convertData.amount || !convertData.rate) return;
 
-    const amount = Number(convertData.amount);
-    const rate = Number(convertData.rate);
+    const amount = Number(convertData.amount.replace(/,/g, ''));
+    const rate = Number(convertData.rate.replace(/,/g, ''));
     
     // Calculate based on operation
     const totalTarget = convertData.operation === 'multiply' 
@@ -224,6 +329,13 @@ export function Customers() {
                 <p className="text-sm text-slate-500">کد: {customer.customer_code}</p>
               </div>
               <div className="flex gap-2">
+                <button 
+                  onClick={() => handleOpenShare(customer)}
+                  className="rounded-lg p-2 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
+                  title="اشتراک گذاری صورت حساب"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
                 <button 
                   onClick={() => {
                     setSelectedCustomer(customer);
@@ -326,28 +438,28 @@ export function Customers() {
                 <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">افغانی</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
-                      value={formData.initial_afghani} onChange={e => setFormData({...formData, initial_afghani: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
+                      value={formData.initial_afghani} onChange={e => setFormData({...formData, initial_afghani: formatCurrencyInput(e.target.value)})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">تومان نقد</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
-                      value={formData.initial_toman_cash} onChange={e => setFormData({...formData, initial_toman_cash: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
+                      value={formData.initial_toman_cash} onChange={e => setFormData({...formData, initial_toman_cash: formatCurrencyInput(e.target.value)})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">تومان بانکی</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
-                      value={formData.initial_toman_bank} onChange={e => setFormData({...formData, initial_toman_bank: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
+                      value={formData.initial_toman_bank} onChange={e => setFormData({...formData, initial_toman_bank: formatCurrencyInput(e.target.value)})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">دالر</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
-                      value={formData.initial_dollar} onChange={e => setFormData({...formData, initial_dollar: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
+                      value={formData.initial_dollar} onChange={e => setFormData({...formData, initial_dollar: formatCurrencyInput(e.target.value)})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">کلدار</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
-                      value={formData.initial_kaldar} onChange={e => setFormData({...formData, initial_kaldar: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-blue-500"
+                      value={formData.initial_kaldar} onChange={e => setFormData({...formData, initial_kaldar: formatCurrencyInput(e.target.value)})} />
                   </div>
                 </div>
               </div>
@@ -357,35 +469,41 @@ export function Customers() {
                 <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">افغانی</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
-                      value={formData.initial_debt_afghani} onChange={e => setFormData({...formData, initial_debt_afghani: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_afghani} onChange={e => setFormData({...formData, initial_debt_afghani: formatCurrencyInput(e.target.value)})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">تومان نقد</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
-                      value={formData.initial_debt_toman_cash} onChange={e => setFormData({...formData, initial_debt_toman_cash: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_toman_cash} onChange={e => setFormData({...formData, initial_debt_toman_cash: formatCurrencyInput(e.target.value)})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">تومان بانکی</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
-                      value={formData.initial_debt_toman_bank} onChange={e => setFormData({...formData, initial_debt_toman_bank: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_toman_bank} onChange={e => setFormData({...formData, initial_debt_toman_bank: formatCurrencyInput(e.target.value)})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">دالر</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
-                      value={formData.initial_debt_dollar} onChange={e => setFormData({...formData, initial_debt_dollar: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_dollar} onChange={e => setFormData({...formData, initial_debt_dollar: formatCurrencyInput(e.target.value)})} />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">کلدار</label>
-                    <input type="number" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
-                      value={formData.initial_debt_kaldar} onChange={e => setFormData({...formData, initial_debt_kaldar: e.target.value})} />
+                    <input type="text" dir="ltr" className="w-full rounded-lg border border-slate-300 p-1.5 text-sm outline-none focus:border-red-500"
+                      value={formData.initial_debt_kaldar} onChange={e => setFormData({...formData, initial_debt_kaldar: formatCurrencyInput(e.target.value)})} />
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">انصراف</button>
-                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">ذخیره</button>
+              <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" required className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-sm font-medium text-slate-700">تایید نهایی</span>
+                </label>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setShowModal(false)} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">انصراف</button>
+                  <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">ذخیره</button>
+                </div>
               </div>
             </form>
           </div>
@@ -424,10 +542,10 @@ export function Customers() {
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">مبلغ (ارز مبدا)</label>
                 <input 
-                  type="number" required
+                  type="text" dir="ltr" required
                   className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
                   value={convertData.amount}
-                  onChange={e => setConvertData({...convertData, amount: e.target.value})}
+                  onChange={e => setConvertData({...convertData, amount: formatCurrencyInput(e.target.value)})}
                 />
               </div>
 
@@ -460,24 +578,30 @@ export function Customers() {
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">نرخ تبدیل</label>
                 <input 
-                  type="number" required step="any"
+                  type="text" dir="ltr" required
                   className="w-full rounded-lg border border-slate-300 p-2.5 outline-none focus:border-blue-500"
                   value={convertData.rate}
-                  onChange={e => setConvertData({...convertData, rate: e.target.value})}
+                  onChange={e => setConvertData({...convertData, rate: formatCurrencyInput(e.target.value)})}
                 />
                 <p className="mt-1 text-xs text-slate-500">
                   {convertData.amount && convertData.rate && (
                     `مبلغ نهایی: ${(convertData.operation === 'multiply' 
-                      ? Number(convertData.amount) * Number(convertData.rate) 
-                      : Number(convertData.amount) / Number(convertData.rate)
+                      ? Number(convertData.amount.replace(/,/g, '')) * Number(convertData.rate.replace(/,/g, '')) 
+                      : Number(convertData.amount.replace(/,/g, '')) / Number(convertData.rate.replace(/,/g, ''))
                     ).toLocaleString()} ${convertData.toCurrency}`
                   )}
                 </p>
               </div>
 
-              <div className="mt-6 flex justify-end gap-3">
-                <button type="button" onClick={() => setShowConvertModal(false)} className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100">انصراف</button>
-                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">ثبت تبدیل</button>
+              <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" required className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-sm font-medium text-slate-700">تایید نهایی</span>
+                </label>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setShowConvertModal(false)} className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100">انصراف</button>
+                  <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">ثبت تبدیل</button>
+                </div>
               </div>
             </form>
           </div>
@@ -540,9 +664,23 @@ export function Customers() {
                       onChange={(e) => setHistoryDesc(e.target.value)}
                     />
                   </div>
+                  <div className="flex items-center gap-2 pt-2">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                        checked={isHistoryConfirmed}
+                        onChange={(e) => setIsHistoryConfirmed(e.target.checked)}
+                      />
+                      <span className="text-sm font-medium text-slate-700">تایید نهایی</span>
+                    </label>
+                  </div>
                   <button 
                     onClick={handleSaveHistory}
-                    className="w-full rounded-lg bg-purple-600 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                    disabled={!isHistoryConfirmed}
+                    className={`w-full rounded-lg py-2 text-sm font-medium text-white transition-colors ${
+                      isHistoryConfirmed ? 'bg-purple-600 hover:bg-purple-700' : 'bg-slate-300 cursor-not-allowed'
+                    }`}
                   >
                     ثبت و قید بیلانس
                   </button>
@@ -645,6 +783,118 @@ export function Customers() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Share Modal */}
+      {showShareModal && selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/50 p-4">
+          <div className="mb-4 flex w-full max-w-2xl justify-end gap-2">
+            <button 
+              onClick={handleShareWhatsApp}
+              className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 font-medium text-white shadow hover:bg-green-600"
+            >
+              <MessageCircle className="h-4 w-4" />
+              ارسال به واتساپ
+            </button>
+            <button 
+              onClick={handleDownloadImage}
+              className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 font-medium text-slate-700 shadow hover:bg-slate-50"
+            >
+              <ImageIcon className="h-4 w-4" />
+              ذخیره عکس
+            </button>
+            <button 
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow hover:bg-blue-700"
+            >
+              <Download className="h-4 w-4" />
+              دانلود PDF
+            </button>
+            <button 
+              onClick={() => setShowShareModal(false)}
+              className="flex items-center justify-center rounded-lg bg-white p-2 text-slate-500 shadow hover:bg-slate-50"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl max-h-[80vh]">
+            <div id="statement-capture" className="bg-white p-8">
+              <div className="mb-8 border-b border-slate-200 pb-6 text-center">
+                <h2 className="text-2xl font-bold text-slate-800">صورت حساب مشتری</h2>
+                <p className="mt-2 text-slate-500">تاریخ: {format(new Date(), 'yyyy/MM/dd')}</p>
+              </div>
+
+              <div className="mb-8 flex justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">نام مشتری:</p>
+                  <p className="text-lg font-bold text-slate-800">{selectedCustomer.customer_name}</p>
+                </div>
+                {selectedCustomer.customer_code && (
+                  <div className="text-left">
+                    <p className="text-sm text-slate-500">کد مشتری:</p>
+                    <p className="font-mono font-medium text-slate-800">{selectedCustomer.customer_code}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h4 className="mb-3 font-bold text-slate-700">وضعیت حساب فعلی</h4>
+                <div className="space-y-2">
+                  {Object.entries(currentBalances).length > 0 ? (
+                    Object.entries(currentBalances).map(([curr, amount]) => (
+                      <div key={curr} className="flex justify-between border-b border-slate-200 pb-2 last:border-0 last:pb-0">
+                        <span className="text-slate-600">{curr}:</span>
+                        <span className={`font-mono font-bold ${amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {Math.abs(amount).toLocaleString()} {amount > 0 ? 'بدهکار' : 'بستانکار'}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-slate-500">حساب صفر است.</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="mb-3 font-bold text-slate-700">ریز تراکنش‌های اخیر</h4>
+                <table className="w-full text-right text-sm">
+                  <thead className="bg-slate-100 text-xs font-medium text-slate-600">
+                    <tr>
+                      <th className="px-4 py-2">تاریخ</th>
+                      <th className="px-4 py-2">نوع</th>
+                      <th className="px-4 py-2">مبلغ</th>
+                      <th className="px-4 py-2">ارز</th>
+                      <th className="px-4 py-2">توضیحات</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {customerTransactions.slice(0, 20).map((t) => (
+                      <tr key={t.id}>
+                        <td className="px-4 py-2 text-slate-600">{format(new Date(t.date), 'yyyy/MM/dd')}</td>
+                        <td className="px-4 py-2">
+                          <span className={t.type === 'bard' ? 'text-red-600' : 'text-green-600'}>
+                            {t.type === 'bard' ? 'برد' : 'رسید'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 font-mono font-medium">{t.amount.toLocaleString()}</td>
+                        <td className="px-4 py-2 text-slate-600">{t.currency}</td>
+                        <td className="px-4 py-2 text-slate-500">{t.description}</td>
+                      </tr>
+                    ))}
+                    {customerTransactions.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-4 text-center text-slate-500">هیچ تراکنشی یافت نشد.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {customerTransactions.length > 20 && (
+                  <p className="mt-4 text-center text-xs text-slate-400">فقط ۲۰ تراکنش آخر نمایش داده شده است.</p>
+                )}
               </div>
             </div>
           </div>

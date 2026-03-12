@@ -205,6 +205,24 @@ function initTables(database: Database) {
     );
   `);
 
+  // App Settings (Key-Value)
+  database.run(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
+  `);
+  
+  // Initialize default app settings
+  const hasUpdateLock = database.exec("SELECT count(*) as count FROM app_settings WHERE key = 'update_lock'");
+  if (hasUpdateLock.length === 0 || hasUpdateLock[0].values[0][0] === 0) {
+    database.run(`
+      INSERT INTO app_settings (key, value) VALUES
+      ('update_lock', '1'),
+      ('update_code', '4587');
+    `);
+  }
+
   // 9. Saved Reports
   database.run(`
     CREATE TABLE IF NOT EXISTS saved_reports (
@@ -227,6 +245,13 @@ function initTables(database: Database) {
       description TEXT
     );
   `);
+
+  // Migrations
+  try {
+    database.run("ALTER TABLE journal ADD COLUMN is_confirmed INTEGER DEFAULT 0;");
+  } catch (e) {
+    // Column might already exist
+  }
 }
 
 // Helper to run a query and return objects

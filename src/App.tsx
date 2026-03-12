@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { initDB } from './services/db';
 import { AuthService } from './services/auth';
+import { SettingsService } from './services/settings';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
+import { UpdateLockScreen } from './components/UpdateLockScreen';
 import { ManagementDashboard } from './pages/ManagementDashboard';
 import { Dashboard } from './pages/Dashboard';
 import { Customers } from './pages/Customers';
@@ -17,6 +19,7 @@ import { Loader2 } from 'lucide-react';
 export default function App() {
   const [isInit, setIsInit] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isUpdateLocked, setIsUpdateLocked] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
 
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +27,7 @@ export default function App() {
   useEffect(() => {
     initDB().then(() => {
       setIsInit(true);
+      setIsUpdateLocked(SettingsService.isUpdateLocked());
     }).catch(err => {
       console.error("DB Init Failed", err);
       setError("خطا در بارگذاری دیتابیس. لطفا اتصال اینترنت خود را بررسی کنید (برای بار اول نیاز است).");
@@ -56,6 +60,10 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  if (isUpdateLocked) {
+    return <UpdateLockScreen onUnlock={() => setIsUpdateLocked(false)} />;
   }
 
   if (!isAuthenticated) {

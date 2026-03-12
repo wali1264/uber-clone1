@@ -17,6 +17,7 @@ export interface JournalEntry {
   description: string;
   date: string;
   sentence: string;
+  is_confirmed?: number;
 }
 
 export const CustomerService = {
@@ -133,6 +134,10 @@ export const JournalService = {
 
   delete: async (id: number) => {
     await run("DELETE FROM journal WHERE id = ?", [id]);
+  },
+
+  confirm: async (id: number, status: number) => {
+    await run("UPDATE journal SET is_confirmed = ? WHERE id = ?", [status, id]);
   },
 
   getDailyReport: (dateStr: string) => {

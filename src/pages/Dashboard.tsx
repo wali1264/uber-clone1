@@ -76,6 +76,11 @@ export function Dashboard() {
     }
   };
 
+  const handleConfirm = async (id: number, status: number) => {
+    await JournalService.confirm(id, status);
+    fetchData();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -115,6 +120,7 @@ export function Dashboard() {
                 <th className="px-6 py-4">مبلغ</th>
                 <th className="px-6 py-4">ارز</th>
                 <th className="px-6 py-4">توضیحات</th>
+                <th className="px-6 py-4">وضعیت</th>
                 <th className="px-6 py-4">عملیات</th>
               </tr>
             </thead>
@@ -143,6 +149,7 @@ export function Dashboard() {
                     <td className="px-6 py-4 text-sm font-medium text-slate-800">{curr}</td>
                     <td className="px-6 py-4 text-sm text-slate-500">انتقال از روز قبل</td>
                     <td className="px-6 py-4"></td>
+                    <td className="px-6 py-4"></td>
                   </tr>
                 );
               })}
@@ -169,6 +176,32 @@ export function Dashboard() {
                   <td className="px-6 py-4 text-sm text-slate-600">{entry.currency}</td>
                   <td className="px-6 py-4 text-sm text-slate-500">{entry.description}</td>
                   <td className="px-6 py-4">
+                    {entry.is_confirmed === 1 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                        تایید شده
+                      </span>
+                    ) : entry.is_confirmed === -1 ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                        رد شده
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleConfirm(entry.id, 1)}
+                          className="rounded-lg bg-green-50 px-3 py-1 text-xs font-medium text-green-600 hover:bg-green-100"
+                        >
+                          تایید نهایی مدیر
+                        </button>
+                        <button
+                          onClick={() => handleConfirm(entry.id, -1)}
+                          className="rounded-lg bg-red-50 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-100"
+                        >
+                          رد
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
                     <button 
                       onClick={() => handleDelete(entry.id)}
                       className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
@@ -181,7 +214,7 @@ export function Dashboard() {
               
               {entries.length === 0 && Object.keys(openingBalances).length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                  <td colSpan={8} className="py-8 text-center text-slate-500">
                     هیچ تراکنشی برای این تاریخ یافت نشد
                   </td>
                 </tr>
@@ -300,20 +333,26 @@ export function Dashboard() {
                 />
               </div>
 
-              <div className="mt-6 flex justify-end gap-3">
-                <button 
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100"
-                >
-                  انصراف
-                </button>
-                <button 
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
-                >
-                  ثبت تراکنش
-                </button>
+              <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" required className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-sm font-medium text-slate-700">تایید نهایی مشتری</span>
+                </label>
+                <div className="flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100"
+                  >
+                    انصراف
+                  </button>
+                  <button 
+                    type="submit"
+                    className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
+                  >
+                    ثبت تراکنش
+                  </button>
+                </div>
               </div>
             </form>
           </div>

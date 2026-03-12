@@ -159,9 +159,15 @@ export function Cashbox() {
                   onChange={e => setFormData({...formData, description: e.target.value})}
                 />
               </div>
-              <div className="mt-6 flex justify-end gap-3">
-                <button type="button" onClick={() => setShowModal(false)} className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100">انصراف</button>
-                <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">ذخیره</button>
+              <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" required className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-sm font-medium text-slate-700">تایید نهایی</span>
+                </label>
+                <div className="flex gap-3">
+                  <button type="button" onClick={() => setShowModal(false)} className="rounded-lg px-4 py-2 text-slate-600 hover:bg-slate-100">انصراف</button>
+                  <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">ذخیره</button>
+                </div>
               </div>
             </form>
           </div>
